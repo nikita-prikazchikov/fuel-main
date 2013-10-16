@@ -14,10 +14,12 @@
 
 
 from abc import abstractproperty, abstractmethod
+import hashlib
+
 from devops.helpers.helpers import _get_file_size
 from devops.manager import Manager
 from ipaddr import IPNetwork
-import hashlib
+
 from fuelweb_test.node_roles import Nodes
 from fuelweb_test.settings import EMPTY_SNAPSHOT, ISO_PATH, USE_ALL_DISKS
 
@@ -41,6 +43,17 @@ class CiBase(object):
             self.environment().revert(name)
             return True
         return False
+
+    def get_active_state(self, name):
+        if self.environment().has_snapshot(name):
+            self.environment().revert(name)
+            self.environment().resume()
+            return True
+        return False
+
+    def make_snapshot(self, snapshot_name):
+        self.environment().suspend(verbose=False)
+        self.environment().snapshot(snapshot_name)
 
     def environment(self):
         """

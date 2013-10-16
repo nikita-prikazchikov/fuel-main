@@ -14,18 +14,19 @@
 
 
 import logging
+import re
+
 from devops.helpers.helpers import SSHClient, wait, _wait
 from paramiko import RSAKey
-import re
-import hashlib
+
 from fuelweb_test.helpers import Ebtables
 from fuelweb_test.integration.base_test_case import BaseTestCase
 from fuelweb_test.integration.decorators import debug
 from fuelweb_test.nailgun_client import NailgunClient
-from fuelweb_test.settings import CLEAN, NETWORK_MANAGERS, EMPTY_SNAPSHOT, \
-    REDHAT_USERNAME, REDHAT_PASSWORD, REDHAT_SATELLITE_HOST, \
+from fuelweb_test.settings import NETWORK_MANAGERS, REDHAT_USERNAME, REDHAT_PASSWORD, REDHAT_SATELLITE_HOST, \
     REDHAT_ACTIVATION_KEY, OPENSTACK_RELEASE, OPENSTACK_RELEASE_REDHAT, \
     REDHAT_LICENSE_TYPE, READY_SNAPSHOT
+
 
 logger = logging.getLogger(__name__)
 logwrap = debug(logger)
@@ -133,6 +134,18 @@ class BaseNodeTestCase(BaseTestCase):
         return cluster_id
 
     @logwrap
+    def basic_cluster_setup(self, cluster_id, nodes_dict, port=5514):
+        self.client.add_syslog_server(
+            cluster_id, self.ci().get_host_node_ip(), port)
+
+        self.bootstrap_nodes(self.devops_nodes_by_names(nodes_dict.keys()))
+        self.configure_cluster(cluster_id, nodes_dict)
+
+    def deploy_cluster_wait(self, cluster_id):
+        task = self.deploy_cluster(cluster_id)
+        self.assertTaskSuccess(task)
+
+    @logwrap
     def prepare_environment(self, name='cluster_name', mode="multinode",
                             settings=None, save_state=True):
         if not(self.ci().revert_to_state(settings)):
@@ -161,6 +174,14 @@ class BaseNodeTestCase(BaseTestCase):
             if save_state:
                 self.ci().snapshot_state(name, settings)
 
+        # return id of last created cluster
+        clusters = self.client.list_clusters()
+        if len(clusters) > 0:
+            return clusters.pop()['id']
+        return None
+
+    @logwrap
+    def get_last_created_cluster(self):
         # return id of last created cluster
         clusters = self.client.list_clusters()
         if len(clusters) > 0:
