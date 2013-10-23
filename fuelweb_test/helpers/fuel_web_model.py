@@ -17,12 +17,12 @@ import logging
 import re
 
 from devops.helpers.helpers import SSHClient, wait, _wait
+from nose.tools import assert_greater_equal
 from paramiko import RSAKey
 
-from fuelweb_test.helpers import Ebtables
-from fuelweb_test.integration.base_test_case import BaseTestCase
-from fuelweb_test.integration.decorators import debug
-from fuelweb_test.nailgun_client import NailgunClient
+from fuelweb_test.helpers.eb_tables import Ebtables
+from fuelweb_test.helpers.decorators import debug
+from fuelweb_test.helpers.nailgun_client import NailgunClient
 from fuelweb_test.settings import NETWORK_MANAGERS, REDHAT_USERNAME, REDHAT_PASSWORD, REDHAT_SATELLITE_HOST, \
     REDHAT_ACTIVATION_KEY, OPENSTACK_RELEASE, OPENSTACK_RELEASE_REDHAT, \
     REDHAT_LICENSE_TYPE, READY_SNAPSHOT
@@ -32,12 +32,13 @@ logger = logging.getLogger(__name__)
 logwrap = debug(logger)
 
 
-class BaseNodeTestCase(BaseTestCase):
-
-    environment_states = {}
+class FuelWebModel(object):
 
     def setUp(self):
         self.client = NailgunClient(self.get_admin_node_ip())
+
+
+
 
     @logwrap
     def get_interface_description(self, ctrl_ssh, interface_short_name):

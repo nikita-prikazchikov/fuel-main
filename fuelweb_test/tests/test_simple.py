@@ -1,7 +1,7 @@
 import logging
 from proboscis import test
-from fuelweb_test.integration.base_node_test_case import BaseNodeTestCase
-from fuelweb_test.integration.decorators import debug
+from fuelweb_test.helpers.fuel_web_model import Environment_Model
+from fuelweb_test.helpers.decorators import debug
 from fuelweb_test.settings import EMPTY_SNAPSHOT, OPENSTACK_RELEASE, OPENSTACK_RELEASE_REDHAT
 
 
@@ -10,8 +10,8 @@ logwrap = debug(logger)
 
 DEPLOYMENT_MODE_SIMPLE = "multinode"
 
-
-class TestBasic(BaseNodeTestCase):
+@test
+class TestBasic(Environment_Model):
 
     @test(groups=["thread_1"])
     def setup_master(self):
@@ -35,7 +35,7 @@ class TestBasic(BaseNodeTestCase):
         self.ci().make_snapshot("ready_with_3_slaves")
 
 
-class TestSimpleFlat(BaseNodeTestCase):
+class TestSimpleFlat(Environment_Model):
 
     @test(groups=["thread_1"], depends_on=[TestBasic.prepare_slaves])
     def simple_flat_deploy(self):

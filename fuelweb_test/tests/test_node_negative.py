@@ -15,14 +15,11 @@
 
 import logging
 import unittest
-from devops.helpers.helpers import wait
 from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
 from fuelweb_test.helpers import Ebtables
-from fuelweb_test.integration.base_node_test_case import BaseNodeTestCase
-from fuelweb_test.integration.decorators import snapshot_errors, \
-    debug, fetch_logs
-from fuelweb_test.settings import EMPTY_SNAPSHOT
+from fuelweb_test.helpers.fuel_web_model import Environment_Model
+from fuelweb_test.helpers.decorators import debug, fetch_logs
 
 logging.basicConfig(
     format=':%(lineno)d: %(asctime)s %(message)s',
@@ -33,7 +30,7 @@ logger = logging.getLogger(__name__)
 logwrap = debug(logger)
 
 
-class TestNodeNegative(BaseNodeTestCase):
+class TestNodeNegative(Environment_Model):
 
     @logwrap
     @fetch_logs

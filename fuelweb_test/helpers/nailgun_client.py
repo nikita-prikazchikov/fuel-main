@@ -16,7 +16,7 @@
 import logging
 from helpers import HTTPClient
 from settings import OPENSTACK_RELEASE
-from integration.decorators import debug, json_parse
+from fuelweb_test.helpers.decorators import debug, json_parse
 
 
 logger = logging.getLogger(__name__)
