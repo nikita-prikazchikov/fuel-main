@@ -18,7 +18,7 @@ import unittest
 from devops.helpers.helpers import wait
 from nose.plugins.attrib import attr
 from fuelweb_test.helpers import Ebtables
-from fuelweb_test.helpers.fuel_web_model import Environment_Model
+from fuelweb_test.helpers.fuel_web_model import FuelWebModel
 from fuelweb_test.helpers.decorators import snapshot_errors, \
     debug, fetch_logs
 from fuelweb_test.settings import EMPTY_SNAPSHOT

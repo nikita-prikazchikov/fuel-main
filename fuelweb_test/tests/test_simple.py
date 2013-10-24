@@ -10,30 +10,6 @@ logwrap = debug(logger)
 
 DEPLOYMENT_MODE_SIMPLE = "multinode"
 
-@test
-class TestBasic(Environment_Model):
-
-    @test(groups=["thread_1"])
-    def setup_master(self):
-        self.ci().get_empty_environment()
-
-    @test(groups=["thread_1"], depends_on=[setup_master])
-    def prepare_release(self):
-        self.ci().get_active_state(EMPTY_SNAPSHOT)
-
-        if OPENSTACK_RELEASE == OPENSTACK_RELEASE_REDHAT:
-            self.update_redhat_credentials()
-            self.assert_release_state(OPENSTACK_RELEASE_REDHAT,
-                                      state='available')
-
-        self.ci().make_snapshot("ready")
-
-    @test(groups=["thread_1"], depends_on=[prepare_release])
-    def prepare_slaves(self):
-        self.ci().get_active_state("ready")
-        self.bootstrap_nodes(self.nodes().slaves[:3])
-        self.ci().make_snapshot("ready_with_3_slaves")
-
 
 class TestSimpleFlat(Environment_Model):
 
