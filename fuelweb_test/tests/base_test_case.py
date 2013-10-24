@@ -1,6 +1,6 @@
 import logging
 from proboscis import test
-from fuelweb_test.helpers.environment import EnvironmentModel
+from fuelweb_test.models.environment import EnvironmentModel
 from fuelweb_test.helpers.decorators import debug
 from fuelweb_test.settings import *
 
@@ -15,9 +15,11 @@ class TestBasic(object):
 
     def __init__(self):
         self.environment = EnvironmentModel()
+        self.fuel_web = self.environment.fuel_web
         super(TestBasic, self).__init__()
 
     @test(groups=["thread_1"])
+
     def setup_master(self):
         self.ci().get_empty_environment()
 

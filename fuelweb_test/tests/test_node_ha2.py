@@ -16,7 +16,7 @@
 import logging
 import unittest
 from nose.plugins.attrib import attr
-from fuelweb_test.helpers.fuel_web_model import Environment_Model
+from fuelweb_test.models.fuel_web_model import Environment_Model
 from fuelweb_test.helpers.decorators import snapshot_errors, \
     debug, fetch_logs
 

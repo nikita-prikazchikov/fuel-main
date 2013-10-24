@@ -1,8 +1,7 @@
 import logging
 from proboscis import test
-from fuelweb_test.helpers.fuel_web_model import Environment_Model
+from fuelweb_test.models.fuel_web_model import Environment_Model
 from fuelweb_test.helpers.decorators import debug
-from fuelweb_test.settings import EMPTY_SNAPSHOT, OPENSTACK_RELEASE, OPENSTACK_RELEASE_REDHAT
 
 
 logger = logging.getLogger(__name__)

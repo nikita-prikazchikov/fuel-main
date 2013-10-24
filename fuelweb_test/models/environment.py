@@ -21,10 +21,9 @@ from ipaddr import IPNetwork
 from devops.helpers.helpers import _get_file_size
 from devops.manager import Manager
 from devops.helpers.helpers import wait
+from fuelweb_test.models.fuel_web_model import FuelWebModel
 
-from fuelweb_test.node_roles import Nodes
-from fuelweb_test.settings import EMPTY_SNAPSHOT, ISO_PATH, USE_ALL_DISKS
-from fuelweb_test.settings import INTERFACE_ORDER, POOLS, FORWARDING, DHCP
+from fuelweb_test.settings import *
 
 
 logger = logging.getLogger('integration')
@@ -39,8 +38,12 @@ class EnvironmentModel(object):
 
     def __init__(self):
         self.manager = Manager()
-        self._environment = None
+        self._fuel_web = FuelWebModel(self.get_admin_node_ip())
         self.saved_environment_states = {}
+
+    @property
+    def fuel_web(self):
+        return self._fuel_web
 
     def remote(self):
         """
@@ -224,7 +227,7 @@ class EnvironmentModel(object):
 
     @property
     def env_name(self):
-        return os.environ.get('ENV_NAME', 'fuelweb')
+        return ENV_NAME
 
     def describe_environment(self):
         """

@@ -17,15 +17,14 @@ import logging
 import re
 
 from devops.helpers.helpers import SSHClient, wait, _wait
-from nose.tools import assert_greater_equal
 from paramiko import RSAKey
+from proboscis.asserts import assert_true, assert_false, assert_equal
+from fuelweb_test.helpers.ci import get_interface_description
 
 from fuelweb_test.helpers.eb_tables import Ebtables
 from fuelweb_test.helpers.decorators import debug
-from fuelweb_test.helpers.nailgun_client import NailgunClient
-from fuelweb_test.settings import NETWORK_MANAGERS, REDHAT_USERNAME, REDHAT_PASSWORD, REDHAT_SATELLITE_HOST, \
-    REDHAT_ACTIVATION_KEY, OPENSTACK_RELEASE, OPENSTACK_RELEASE_REDHAT, \
-    REDHAT_LICENSE_TYPE, READY_SNAPSHOT
+from fuelweb_test.models.nailgun_client import NailgunClient
+from fuelweb_test.settings import *
 
 
 logger = logging.getLogger(__name__)
@@ -34,43 +33,35 @@ logwrap = debug(logger)
 
 class FuelWebModel(object):
 
-    def setUp(self):
-        self.client = NailgunClient(self.get_admin_node_ip())
+    def __init__(self, admin_node_ip):
+        self.admin_node_ip = admin_node_ip
+        self.client = NailgunClient(admin_node_ip)
+        super(FuelWebModel, self).__init__()
 
-
-
-
-    @logwrap
-    def get_interface_description(self, ctrl_ssh, interface_short_name):
-        return ''.join(
-            ctrl_ssh.execute(
-                '/sbin/ip addr show dev %s' % interface_short_name
-            )['stdout']
-        )
-
-    def assertNetworkConfiguration(self, node):
+    def assert_network_configuration(self, node):
         remote = SSHClient(node['ip'], username='root', password='r00tme',
                            private_keys=self.get_private_keys())
         for interface in node['network_data']:
             if interface.get('vlan') is None:
                 continue  # todo excess check fix interface json format
-            interface_name = "%s.%s@%s" % (
+            interface_name = "{}.{}@{}".format(
                 interface['dev'], interface['vlan'], interface['dev'])
-            interface_short_name = "%s.%s" % (
+            interface_short_name = "{}.{}".format(
                 interface['dev'], interface['vlan'])
-            interface_description = self.get_interface_description(
+            interface_description = get_interface_description(
                 remote, interface_short_name)
-            self.assertIn(interface_name, interface_description)
+            assert_true(interface_name in interface_description)
             if interface.get('name') == 'floating':
                 continue
             if interface.get('ip'):
-                self.assertIn("inet %s" % interface.get('ip'),
-                              interface_description)
+                assert_true(
+                    "inet {}".format(interface.get('ip')) in
+                    interface_description)
             else:
-                self.assertNotIn("inet ", interface_description)
+                assert_false("inet " in interface_description)
             if interface.get('brd'):
-                self.assertIn("brd %s" % interface['brd'],
-                              interface_description)
+                assert_true(
+                    "brd {}".format(interface['brd']) in interface_description)
 
     @logwrap
     def is_node_discovered(self, nailgun_node):
@@ -89,33 +80,12 @@ class FuelWebModel(object):
     def get_ebtables(self, cluster_id, devops_nodes):
         return Ebtables(
             self.get_target_devs(devops_nodes),
-            self.client._get_cluster_vlans(cluster_id))
+            self.client.get_cluster_vlans(cluster_id))
 
     @logwrap
-    def _get_common_vlan(self, cluster_id):
-        """Find vlan that must be at all two nodes.
-        """
-        return self.client.get_networks(
-            cluster_id)['networks'][0]['vlan_start']
-
-    @logwrap
-    def _run_network_verify(self, cluster_id):
+    def run_network_verify(self, cluster_id):
         return self.client.verify_networks(
             cluster_id, self.client.get_networks(cluster_id)['networks'])
-
-    @logwrap
-    def check_role_file(self, nodes_dict):
-        for node, roles in self.get_nailgun_node_roles(nodes_dict):
-            remote = SSHClient(
-                node['ip'], username='root', password='r00tme',
-                private_keys=self.get_private_keys())
-            for role in roles:
-                if role != "cinder":
-                    self.assertTrue(remote.isfile('/tmp/%s-file' % role))
-
-    @logwrap
-    def clean_clusters(self):
-        self.client.clean_clusters()
 
     @logwrap
     def configure_cluster(self, cluster_id, nodes_dict):
@@ -123,6 +93,7 @@ class FuelWebModel(object):
         # TODO: update network configuration
 
     @logwrap
+    #TODO remove
     def basic_provisioning(self, cluster_id, nodes_dict, port=5514):
         self.client.add_syslog_server(
             cluster_id, self.ci().get_host_node_ip(), port)
@@ -131,7 +102,7 @@ class FuelWebModel(object):
         self.configure_cluster(cluster_id, nodes_dict)
 
         task = self.deploy_cluster(cluster_id)
-        self.assertTaskSuccess(task)
+        self.assert_task_success(task)
         return cluster_id
 
     @logwrap
@@ -144,7 +115,7 @@ class FuelWebModel(object):
 
     def deploy_cluster_wait(self, cluster_id):
         task = self.deploy_cluster(cluster_id)
-        self.assertTaskSuccess(task)
+        self.assert_task_success(task)
 
     @logwrap
     def prepare_environment(self, name='cluster_name', mode="multinode",
@@ -218,16 +189,17 @@ class FuelWebModel(object):
         return self.client.deploy_cluster_changes(cluster_id)
 
     @logwrap
-    def assertTaskSuccess(self, task, timeout=90 * 60):
-        self.assertEquals('ready', self._task_wait(task, timeout)['status'])
+    def assert_task_success(self, task, timeout=90 * 60):
+        assert_equal('ready', self._task_wait(task, timeout)['status'])
 
     @logwrap
-    def assertTaskFailed(self, task, timeout=70 * 60):
-        self.assertEquals('error', self._task_wait(task, timeout)['status'])
+    def assert_task_failed(self, task, timeout=70 * 60):
+        assert_equal('error', self._task_wait(task, timeout)['status'])
 
     @logwrap
-    def assertOSTFRunSuccess(self, cluster_id, should_fail=0, should_pass=0,
-                             timeout=10 * 60):
+    def assert_ostf_run(self, cluster_id, should_fail=0, should_pass=0,
+                        timeout=10 * 60):
+
         set_result_list = self._ostf_test_wait(cluster_id, timeout)
 
         passed = 0
@@ -242,23 +214,26 @@ class FuelWebModel(object):
                     set_result['tests']
                 )
             )
-        self.assertGreaterEqual(
-            passed, should_pass, 'Passed tests, pass: {}'.format(passed)
+        assert_true(
+            passed >= should_pass, 'Passed tests, pass: {}'.format(passed)
         )
-        self.assertLessEqual(
-            failed, should_fail, 'Failed tests,  fails: {}'.format(failed)
+        assert_true(
+            failed <= should_fail, 'Failed tests,  fails: {}'.format(failed)
         )
 
     @logwrap
-    def run_OSTF(self, cluster_id, test_sets=None,
+    def run_ostf(self, cluster_id, test_sets=None,
                  should_fail=0, should_pass=0):
         test_sets = test_sets \
             if test_sets is not None \
             else ['smoke', 'sanity']
 
         self.client.ostf_run_tests(cluster_id, test_sets)
-        self.assertOSTFRunSuccess(cluster_id, should_fail=should_fail,
-                                  should_pass=should_pass)
+        self.assert_ostf_run(
+            cluster_id,
+            should_fail=should_fail,
+            should_pass=should_pass
+        )
 
     @logwrap
     def _task_wait(self, task, timeout):

@@ -24,8 +24,8 @@ logwrap = debug(logger)
 
 
 class NailgunClient(object):
-    def __init__(self, ip):
-        self.client = HTTPClient(url="http://{}:8000".format(ip))
+    def __init__(self, admin_node_ip):
+        self.client = HTTPClient(url="http://{}:8000".format(admin_node_ip))
         super(NailgunClient, self).__init__()
 
     @logwrap
@@ -234,7 +234,7 @@ class NailgunClient(object):
         self.update_cluster_attributes(cluster_id, attributes)
 
     @logwrap
-    def _get_cluster_vlans(self, cluster_id):
+    def get_cluster_vlans(self, cluster_id):
         cluster_vlans = []
         for network in self.get_networks(cluster_id)['networks']:
             if not network['vlan_start'] is None:

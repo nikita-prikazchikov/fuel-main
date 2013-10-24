@@ -18,7 +18,7 @@ import unittest
 from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
 from fuelweb_test.helpers import Ebtables
-from fuelweb_test.helpers.fuel_web_model import Environment_Model
+from fuelweb_test.models.fuel_web_model import Environment_Model
 from fuelweb_test.helpers.decorators import debug, fetch_logs
 
 logging.basicConfig(
@@ -72,12 +72,12 @@ class TestNodeNegative(Environment_Model):
                                    networks=nets)
 
         # run network check:
-        task = self._run_network_verify(cluster_id)
-        self.assertTaskFailed(task, 60 * 5)
+        task = self.run_network_verify(cluster_id)
+        self.assert_task_failed(task, 60 * 5)
 
         # deploy cluster:
         task = self.deploy_cluster(cluster_id)
-        self.assertTaskFailed(task)
+        self.assert_task_failed(task)
 
 
 if __name__ == '__main__':
