@@ -36,6 +36,8 @@ INTERFACE_ORDER = ('internal', 'public', 'private', 'nat')
 PUBLIC_FORWARD = os.environ.get('PUBLIC_FORWARD', None)
 NAT_FORWARD = os.environ.get('NAT_FORWARD', 'nat')
 
+ENV_NAME = os.environ.get("ENV_NAME", "fuel_system_test")
+
 FORWARDING = {
     'public': PUBLIC_FORWARD,
     'internal': None,
