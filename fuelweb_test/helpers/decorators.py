@@ -19,11 +19,11 @@ import logging
 import os
 import time
 import urllib2
-from fuelweb_test.settings import LOGS_DIR
+from fuelweb_test.settings import LOGS_DIR, ENV_NAME
 
 
 def save_logs(url, filename):
-    logging.info('Saving logs to "%s" file' % filename)
+    logging.info('Saving logs to "{}" file'.format(filename))
     try:
         with open(filename, 'w') as f:
             f.write(
@@ -33,44 +33,30 @@ def save_logs(url, filename):
         logging.error(e)
 
 
-def fetch_logs(func):
-    """ Decorator to fetch logs to file.
+def log_snapshot_on_error(func):
+    """
+    Decorator to snapshot environment when error occurred in test.
+    And always fetch diagnostic snapshot from master node
     """
     @functools.wraps(func)
     def wrapper(*args, **kwagrs):
-        # noinspection PyBroadException
-        try:
-            return func(*args, **kwagrs)
-        finally:
-            if LOGS_DIR:
-                if not os.path.exists(LOGS_DIR):
-                    os.makedirs(LOGS_DIR)
-
-                test_case = args[0]
-                task = test_case.client.generate_logs()
-                task = test_case._task_wait(task, 60 * 5)
-                url = "http://%s:8000%s" % \
-                      (test_case.get_admin_node_ip(), task['message'])
-
-                save_logs(
-                    url,
-                    os.path.join(LOGS_DIR, '%s-%d.tar.gz' % (
-                        func.__name__,
-                        time.time())))
-    return wrapper
-
-
-def snapshot_errors(func):
-    """ Decorator to snapshot environment when error occurred in test.
-    """
-    @functools.wraps(func)
-    def wrapper(*args, **kwagrs):
+        status = "pass"
         try:
             return func(*args, **kwagrs)
         except:
-            name = 'error-%s' % func.__name__
+            status = "fail"
+            name = 'error_%s' % func.__name__
             description = "Failed in method '%s'" % func.__name__
-            logging.debug("Snapshot %s %s" % (name, description))
+            logging.debug("Snapshot {} {}".format(name, description))
+            logging.debug(
+                "You could revert this snapshot using [{command}]".format(
+                    command=
+                    "dos.py revert {env} --snapshot-name {name} && "
+                    "dos.py resume {env}".format(
+                        env=ENV_NAME, name=name
+                    )
+                )
+            )
             if args[0].ci() is not None:
                 args[0].ci().environment().suspend(verbose=False)
                 args[0].ci().environment().snapshot(
@@ -79,6 +65,29 @@ def snapshot_errors(func):
                     force=True,
                 )
             raise
+        finally:
+            if LOGS_DIR:
+                if not os.path.exists(LOGS_DIR):
+                    os.makedirs(LOGS_DIR)
+
+                environment = args[0]
+                task = environment.client.generate_logs()
+                task = environment._task_wait(task, 60 * 5)
+                url = "http://{}:8000{}".format(
+                    environment.get_admin_node_ip(), task['message']
+                )
+                save_logs(
+                    url,
+                    os.path.join(
+                        LOGS_DIR,
+                        '{status}_{name}-{time}.tar.gz'.format(
+                            status=status,
+                            name=func.__name__,
+                            time=time.strftime(
+                                "%Y_%m_%d__%H_%M_%S", time.gmtime())
+                        )
+                    )
+                )
     return wrapper
 
 
@@ -87,9 +96,13 @@ def debug(logger):
         @functools.wraps(func)
         def wrapped(*args, **kwargs):
             logger.debug(
-                "Calling: %s with args: %s %s" % (func.__name__, args, kwargs))
+                "Calling: {} with args: {} {}".format(
+                    func.__name__, args, kwargs
+                )
+            )
             result = func(*args, **kwargs)
-            logger.debug("Done: %s with result: %s" % (func.__name__, result))
+            logger.debug(
+                "Done: {} with result: {}".format(func.__name__, result))
             return result
         return wrapped
     return wrapper
