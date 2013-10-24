@@ -68,8 +68,10 @@ class Ebtables(object):
     @logwrap
     def restore_vlan(target_dev, vlan):
         return subprocess.call(
-            ['sudo', 'ebtables', '-t', 'broute', '-D', 'BROUTING', '-i',
-             target_dev, '-p', '8021Q', '--vlan-id', str(vlan), '-j', 'DROP'],
+            [
+                'sudo', 'ebtables', '-t', 'broute', '-D', 'BROUTING', '-i',
+                target_dev, '-p', '8021Q', '--vlan-id', str(vlan), '-j', 'DROP'
+            ],
             stderr=subprocess.STDOUT,
         )
 
@@ -77,8 +79,9 @@ class Ebtables(object):
     @logwrap
     def block_vlan(target_dev, vlan):
         return subprocess.check_output(
-            ['sudo', 'ebtables', '-t', 'broute', '-A', 'BROUTING', '-i',
-             target_dev, '-p', '8021Q', '--vlan-id',  str(vlan), '-j', 'DROP'],
+            [
+                'sudo', 'ebtables', '-t', 'broute', '-A', 'BROUTING', '-i',
+                target_dev, '-p', '8021Q', '--vlan-id', str(vlan), '-j', 'DROP'
+            ],
             stderr=subprocess.STDOUT
         )
-
