@@ -17,11 +17,9 @@ import logging
 import re
 
 from devops.helpers.helpers import SSHClient, wait, _wait
-from paramiko import RSAKey
 from proboscis.asserts import assert_true, assert_false, assert_equal
-from fuelweb_test.helpers.ci import get_interface_description
+from fuelweb_test.helpers.ci import *
 
-from fuelweb_test.helpers.eb_tables import Ebtables
 from fuelweb_test.helpers.decorators import debug
 from fuelweb_test.models.nailgun_client import NailgunClient
 from fuelweb_test.settings import *
@@ -33,35 +31,18 @@ logwrap = debug(logger)
 
 class FuelWebModel(object):
 
-    def __init__(self, admin_node_ip):
+    def __init__(self, admin_node_ip, environment):
         self.admin_node_ip = admin_node_ip
         self.client = NailgunClient(admin_node_ip)
+        self._environment = environment
         super(FuelWebModel, self).__init__()
 
-    def assert_network_configuration(self, node):
-        remote = SSHClient(node['ip'], username='root', password='r00tme',
-                           private_keys=self.get_private_keys())
-        for interface in node['network_data']:
-            if interface.get('vlan') is None:
-                continue  # todo excess check fix interface json format
-            interface_name = "{}.{}@{}".format(
-                interface['dev'], interface['vlan'], interface['dev'])
-            interface_short_name = "{}.{}".format(
-                interface['dev'], interface['vlan'])
-            interface_description = get_interface_description(
-                remote, interface_short_name)
-            assert_true(interface_name in interface_description)
-            if interface.get('name') == 'floating':
-                continue
-            if interface.get('ip'):
-                assert_true(
-                    "inet {}".format(interface.get('ip')) in
-                    interface_description)
-            else:
-                assert_false("inet " in interface_description)
-            if interface.get('brd'):
-                assert_true(
-                    "brd {}".format(interface['brd']) in interface_description)
+    @property
+    def environment(self):
+        """
+        :rtype: EnvironmentModel
+        """
+        return self._environment
 
     @logwrap
     def is_node_discovered(self, nailgun_node):
@@ -70,48 +51,19 @@ class FuelWebModel(object):
                 and node['status'] == 'discover', self.client.list_nodes()))
 
     @logwrap
-    def get_target_devs(self, devops_nodes):
-        return [
-            interface.target_dev for interface in [
-                val for var in map(lambda node: node.interfaces, devops_nodes)
-                for val in var]]
-
-    @logwrap
-    def get_ebtables(self, cluster_id, devops_nodes):
-        return Ebtables(
-            self.get_target_devs(devops_nodes),
-            self.client.get_cluster_vlans(cluster_id))
-
-    @logwrap
     def run_network_verify(self, cluster_id):
         return self.client.verify_networks(
             cluster_id, self.client.get_networks(cluster_id)['networks'])
 
     @logwrap
-    def configure_cluster(self, cluster_id, nodes_dict):
-        self.update_nodes(cluster_id, nodes_dict, True, False)
-        # TODO: update network configuration
+    def add_syslog_server(self, cluster_id, host, port):
+        self.client.add_syslog_server(cluster_id, host, port)
 
     @logwrap
-    #TODO remove
-    def basic_provisioning(self, cluster_id, nodes_dict, port=5514):
+    def basic_cluster_setup(self, cluster_id, port=5514):
         self.client.add_syslog_server(
-            cluster_id, self.ci().get_host_node_ip(), port)
+            cluster_id, self.environment.get_host_node_ip(), port)
 
-        self.bootstrap_nodes(self.devops_nodes_by_names(nodes_dict.keys()))
-        self.configure_cluster(cluster_id, nodes_dict)
-
-        task = self.deploy_cluster(cluster_id)
-        self.assert_task_success(task)
-        return cluster_id
-
-    @logwrap
-    def basic_cluster_setup(self, cluster_id, nodes_dict, port=5514):
-        self.client.add_syslog_server(
-            cluster_id, self.ci().get_host_node_ip(), port)
-
-        self.bootstrap_nodes(self.devops_nodes_by_names(nodes_dict.keys()))
-        self.configure_cluster(cluster_id, nodes_dict)
 
     def deploy_cluster_wait(self, cluster_id):
         task = self.deploy_cluster(cluster_id)
@@ -170,7 +122,8 @@ class FuelWebModel(object):
             if option in ('volumes_ceph', 'images_ceph'):
                 section = 'storage'
             if section:
-                attributes['editable'][section][option]['value'] = settings[option]
+                attributes['editable'][section][option]['value'] =\
+                    settings[option]
 
         self.client.update_cluster_attributes(cluster_id, attributes)
 
@@ -178,8 +131,9 @@ class FuelWebModel(object):
     def get_nailgun_node_roles(self, nodes_dict):
         nailgun_node_roles = []
         for node_name in nodes_dict:
-            slave = self.ci().environment().node_by_name(node_name)
-            node = self.get_node_by_devops_node(slave)
+            slave = self.environment.get_virtual_environment().\
+                node_by_name(node_name)
+            node = self.get_nailgun_node_by_devops_node(slave)
             nailgun_node_roles.append((node, nodes_dict[node_name]))
         return nailgun_node_roles
 
@@ -190,11 +144,11 @@ class FuelWebModel(object):
 
     @logwrap
     def assert_task_success(self, task, timeout=90 * 60):
-        assert_equal('ready', self._task_wait(task, timeout)['status'])
+        assert_equal('ready', self.task_wait(task, timeout)['status'])
 
     @logwrap
     def assert_task_failed(self, task, timeout=70 * 60):
-        assert_equal('error', self._task_wait(task, timeout)['status'])
+        assert_equal('error', self.task_wait(task, timeout)['status'])
 
     @logwrap
     def assert_ostf_run(self, cluster_id, should_fail=0, should_pass=0,
@@ -236,7 +190,7 @@ class FuelWebModel(object):
         )
 
     @logwrap
-    def _task_wait(self, task, timeout):
+    def task_wait(self, task, timeout):
         wait(
             lambda: self.client.get_task(
                 task['id'])['status'] != 'running',
@@ -254,7 +208,7 @@ class FuelWebModel(object):
 
     @logwrap
     def _tasks_wait(self, tasks, timeout):
-        return [self._task_wait(task, timeout) for task in tasks]
+        return [self.task_wait(task, timeout) for task in tasks]
 
     @logwrap
     def _upload_sample_release(self):
@@ -264,8 +218,14 @@ class FuelWebModel(object):
         return release_id
 
     @logwrap
-    def get_or_create_cluster(self, name, release_id, mode="multinode",
-                              net_provider=None, net_segment_type=None):
+    def create_cluster(self, name='default', release_id=None, mode="multinode",
+                       net_provider=None, net_segment_type=None, port=5514):
+        """
+        :param name:
+        :param release_id:
+        :param mode:
+        :return: cluster_id
+        """
         if not release_id:
             release_id = self._upload_sample_release()
         cluster_id = self.client.get_cluster_id(name)
@@ -284,27 +244,16 @@ class FuelWebModel(object):
                     }
                 )
 
-            self.client.create_cluster(
-                data=data
-            )
+            self.client.create_cluster(data=data)
             cluster_id = self.client.get_cluster_id(name)
+
         if not cluster_id:
             raise Exception("Could not get cluster '%s'" % name)
-        return cluster_id
 
-    @logwrap
-    def create_cluster(self, name='default', release_id=None,
-                       mode="multinode", net_provider=None,
-                       net_segment_type=None):
-        """
-        :param name:
-        :param release_id:
-        :param mode:
-        :return: cluster_id
-        """
-        return self.get_or_create_cluster(name, release_id, mode,
-                                          net_provider=net_provider,
-                                          net_segment_type=net_segment_type)
+        self.client.add_syslog_server(
+            cluster_id, self.environment.get_host_node_ip(), port)
+
+        return cluster_id
 
     @logwrap
     def update_nodes(self, cluster_id, nodes_dict,
@@ -312,14 +261,20 @@ class FuelWebModel(object):
         # update nodes in cluster
         nodes_data = []
         for node_name in nodes_dict:
-            devops_node = self.ci().environment().node_by_name(node_name)
-            node = self.get_node_by_devops_node(devops_node)
-            node_data = {'cluster_id': cluster_id, 'id': node['id'],
-                         'pending_addition': pending_addition,
-                         'pending_deletion': pending_deletion,
-                         'pending_roles': nodes_dict[node_name],
-                         'name': '%s_%s' % (self.ci().environment().name,
-                                            devops_node.name)}
+            devops_node = self.environment.get_virtual_environment().\
+                node_by_name(node_name)
+            node = self.get_nailgun_node_by_devops_node(devops_node)
+            node_data = {
+                'cluster_id': cluster_id,
+                'id': node['id'],
+                'pending_addition': pending_addition,
+                'pending_deletion': pending_deletion,
+                'pending_roles': nodes_dict[node_name],
+                'name': '{}_{}'.format(
+                    node_name,
+                    "_".join(nodes_dict[node_name])
+                )
+            }
             nodes_data.append(node_data)
 
         # assume nodes are going to be updated for one cluster only
@@ -328,129 +283,77 @@ class FuelWebModel(object):
         self.client.update_nodes(nodes_data)
 
         nailgun_nodes = self.client.list_cluster_nodes(cluster_id)
-        cluster_node_ids = map(lambda node: str(node['id']), nailgun_nodes)
-        self.assertTrue(
+        cluster_node_ids = map(lambda _node: str(_node['id']), nailgun_nodes)
+        assert_true(
             all([node_id in cluster_node_ids for node_id in node_ids]))
         return nailgun_nodes
 
     @logwrap
-    def get_node_by_devops_node(self, devops_node):
-        """Returns dict with nailgun slave node description if node is
+    def get_nailgun_node_by_devops_node(self, devops_node):
+        """
+        Returns dict with nailgun slave node description if node is
         registered. Otherwise return None.
         """
         mac_addresses = map(
             lambda interface: interface.mac_address.capitalize(),
-            devops_node.interfaces)
+            devops_node.interfaces
+        )
         for nailgun_node in self.client.list_nodes():
             if nailgun_node['mac'].capitalize() in mac_addresses:
                 nailgun_node['devops_name'] = devops_node.name
                 return nailgun_node
+
         return None
 
-    def nailgun_nodes(self, devops_nodes):
-        return map(lambda node: self.get_node_by_devops_node(node),
-                   devops_nodes)
-
-    def devops_nodes_by_names(self, devops_node_names):
-        return map(lambda name: self.ci().environment().node_by_name(name),
-                   devops_node_names)
-
     @logwrap
-    def bootstrap_nodes(self, devops_nodes, timeout=600):
-        """Start vms and wait they are registered on nailgun.
-        :rtype : List of registred nailgun nodes
-        """
-        for node in devops_nodes:
-            node.start()
-        wait(lambda: all(self.nailgun_nodes(devops_nodes)), 15, timeout)
-        return self.nailgun_nodes(devops_nodes)
-
-    @logwrap
-    def assert_service_list(self, remote, smiles_count):
-        ret = remote.check_call('/usr/bin/nova-manage service list')
-        self.assertEqual(
-            smiles_count, ''.join(ret['stdout']).count(":-)"), "Smiles count")
-        self.assertEqual(
-            0, ''.join(ret['stdout']).count("XXX"), "Broken services count")
-
-    @logwrap
-    def assert_node_service_list(self, node_name, smiles_count):
-        ip = self.get_node_by_devops_node(
-            self.ci().environment().node_by_name(node_name))['ip']
-        remote = SSHClient(ip, username='root', password='r00tme',
-                           private_keys=self.get_private_keys())
-        return self.assert_service_list(remote, smiles_count)
-
-    @logwrap
-    def assert_glance_index(self, ctrl_ssh):
-        ret = ctrl_ssh.check_call('. /root/openrc; glance index')
-        self.assertEqual(1, ''.join(ret['stdout']).count("TestVM"))
-
-    @logwrap
-    def assert_network_list(self, networks_count, remote):
-        ret = remote.check_call('/usr/bin/nova-manage network list')
-        self.assertEqual(networks_count + 1, len(ret['stdout']))
-
-    @logwrap
-    def assertClusterReady(self, node_name, smiles_count,
-                           networks_count=1, timeout=300):
+    def assert_cluster_ready(self, node_name, smiles_count,
+                             networks_count=1, timeout=300):
         _wait(
             lambda: self.get_cluster_status(
-                self.get_node_by_devops_node(
-                    self.ci().environment().node_by_name(node_name))['ip'],
+                self.get_nailgun_node_by_devops_node(
+                    self.environment.get_virtual_environment().
+                    node_by_name(node_name))['ip'],
                 smiles_count=smiles_count,
                 networks_count=networks_count),
             timeout=timeout)
 
     @logwrap
-    def _get_remote(self, ip):
-        return SSHClient(ip, username='root', password='r00tme',
-                         private_keys=self.get_private_keys())
+    def get_ssh_for_node(self, node_name):
+        ip = self.get_nailgun_node_by_devops_node(
+            self.environment.get_virtual_environment().
+            node_by_name(node_name))['ip']
+        return self.environment.get_ssh_to_remote(ip)
 
     @logwrap
-    def _get_remote_for_node(self, node_name):
-        ip = self.get_node_by_devops_node(
-            self.ci().environment().node_by_name(node_name))['ip']
-        return self._get_remote(ip)
-
-    @logwrap
-    def _get_remote_for_role(self, nodes_dict, role):
+    def get_ssh_for_role(self, nodes_dict, role):
         node_name = sorted(filter(lambda name: role in nodes_dict[name],
                            nodes_dict.keys()))[0]
-        return self._get_remote_for_node(node_name)
+        return self.get_ssh_for_node(node_name)
 
     @logwrap
     def get_cluster_status(self, ip, smiles_count, networks_count=1):
-        remote = self._get_remote(ip)
-        self.assert_service_list(remote, smiles_count)
-        self.assert_glance_index(remote)
-        self.assert_network_list(networks_count, remote)
+        remote = self.environment.get_ssh_to_remote(ip)
+        assert_service_list(remote, smiles_count)
+        assert_glance_index(remote)
+        assert_network_list(networks_count, remote)
 
     @logwrap
     def get_cluster_floating_list(self, node_name):
-        remote = self._get_remote_for_node(node_name)
+        remote = self.get_ssh_for_node(node_name)
         ret = remote.check_call('/usr/bin/nova-manage floating list')
         ret_str = ''.join(ret['stdout'])
         return re.findall('(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})', ret_str)
 
     @logwrap
     def get_cluster_block_devices(self, node_name):
-        remote = self._get_remote_for_node(node_name)
+        remote = self.get_ssh_for_node(node_name)
         ret = remote.check_call('/bin/lsblk')
         return ''.join(ret['stdout'])
 
     @logwrap
     def assert_cluster_floating_list(self, node_name, expected_ips):
         current_ips = self.get_cluster_floating_list(node_name)
-        self.assertEqual(set(expected_ips), set(current_ips))
-
-    @logwrap
-    def get_private_keys(self):
-        keys = []
-        for key_string in ['/root/.ssh/id_rsa', '/root/.ssh/bootstrap.rsa']:
-            with self.remote().open(key_string) as f:
-                keys.append(RSAKey.from_private_key(f))
-        return keys
+        assert_equal(set(expected_ips), set(current_ips))
 
     @logwrap
     def update_node_networks(self, node_id, interfaces_dict):
@@ -483,32 +386,6 @@ class FuelWebModel(object):
             net_manager=NETWORK_MANAGERS['vlan'])
 
     @logwrap
-    def get_ready_environment(self):
-        if self.ci().get_state(READY_SNAPSHOT):
-            self.environment().resume(verbose=False)
-            return
-
-        self.ci().get_empty_environment()
-        if OPENSTACK_RELEASE == OPENSTACK_RELEASE_REDHAT:
-            # update redhat credentials so that fuel may upload redhat
-            # packages
-
-            # download redhat repo from local place to boost the test
-            # remote = self.nodes().admin.remote(
-            #   'internal', 'root', 'r00tme')
-            # remote.execute(
-            #   'wget -q http://172.18.67.168/rhel6/rhel-rpms.tar.gz')
-            # remote.execute('tar xzf rhel-rpms.tar.gz -C /')
-
-            self.update_redhat_credentials()
-            self.assert_release_state(OPENSTACK_RELEASE_REDHAT,
-                                      state='available')
-
-        self.environment().suspend(verbose=False)
-        self.environment().snapshot(READY_SNAPSHOT)
-        self.environment().resume(verbose=False)
-
-    @logwrap
     def update_redhat_credentials(
             self, license_type=REDHAT_LICENSE_TYPE,
             username=REDHAT_USERNAME, password=REDHAT_PASSWORD,
@@ -530,37 +407,24 @@ class FuelWebModel(object):
             if task['name'] == 'redhat_setup' \
                     and task['result']['release_info']['release_id'] \
                             == release_id:
-                return self._task_wait(task, 60 * 120)
+                return self.task_wait(task, 60 * 120)
 
     def assert_release_state(self, release_name, state='available'):
         for release in self.client.get_releases():
             if release["name"].find(release_name) != -1:
-                self.assertEqual(release['state'], state)
+                assert_equal(release['state'], state)
                 return release["id"]
 
     @logwrap
-    def assert_murano_service(self, node_name):
-        ip = self.get_node_by_devops_node(
-            self.ci().environment().node_by_name(node_name))['ip']
-        remote = SSHClient(
-            ip, username='root', password='r00tme',
-            private_keys=self.get_private_keys())
-        ps_output = remote.execute('ps ax')['stdout']
-
-        murano_api = filter(lambda x: 'murano-api' in x, ps_output)
-        self.assertEqual(len(murano_api), 1)
-
-        muranoconductor = filter(lambda x: 'muranoconductor' in x, ps_output)
-        self.assertEqual(len(muranoconductor), 1)
+    def verify_murano_service(self, node_name):
+        ip = self.get_nailgun_node_by_devops_node(
+            self.environment.get_virtual_environment().
+            node_by_name(node_name))['ip']
+        assert_murano_service(self.environment.get_ssh_to_remote(ip))
 
     @logwrap
-    def assert_savanna_service(self, node_name):
-        ip = self.get_node_by_devops_node(
-            self.ci().environment().node_by_name(node_name))['ip']
-        remote = SSHClient(
-            ip, username='root', password='r00tme',
-            private_keys=self.get_private_keys())
-        ps_output = remote.execute('ps ax')['stdout']
-
-        savanna_api = filter(lambda x: 'savanna-api' in x, ps_output)
-        self.assertEquals(len(savanna_api), 1)
+    def verify_savanna_service(self, node_name):
+        ip = self.get_nailgun_node_by_devops_node(
+            self.environment.get_virtual_environment().
+            node_by_name(node_name))['ip']
+        assert_savanna_service(self.environment.get_ssh_to_remote(ip))

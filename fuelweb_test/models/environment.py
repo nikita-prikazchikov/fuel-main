@@ -18,15 +18,21 @@ import time
 import logging
 from ipaddr import IPNetwork
 
+from paramiko import RSAKey
+
 from devops.helpers.helpers import _get_file_size
 from devops.manager import Manager
-from devops.helpers.helpers import wait
-from fuelweb_test.models.fuel_web_model import FuelWebModel
+from devops.helpers.helpers import wait, SSHClient
 
+from fuelweb_test.helpers.ci import *
+from fuelweb_test.helpers.decorators import debug
+from fuelweb_test.helpers.eb_tables import Ebtables
+from fuelweb_test.models.fuel_web_model import FuelWebModel
 from fuelweb_test.settings import *
 
 
 logger = logging.getLogger('integration')
+logwrap = debug(logger)
 
 
 class EnvironmentModel(object):
@@ -38,8 +44,8 @@ class EnvironmentModel(object):
 
     def __init__(self):
         self.manager = Manager()
-        self._fuel_web = FuelWebModel(self.get_admin_node_ip())
-        self.saved_environment_states = {}
+        self._fuel_web = FuelWebModel(self.get_admin_node_ip(), self)
+        self._virtual_environment = None
 
     @property
     def fuel_web(self):
@@ -54,44 +60,64 @@ class EnvironmentModel(object):
             login='root',
             password='r00tme')
 
+    @logwrap
+    def get_ssh_to_remote(self, ip):
+        return SSHClient(ip, username='root', password='r00tme',
+                         private_keys=self.get_private_keys())
+
+    @logwrap
+    def get_private_keys(self):
+        keys = []
+        for key_string in ['/root/.ssh/id_rsa', '/root/.ssh/bootstrap.rsa']:
+            with self.remote().open(key_string) as f:
+                keys.append(RSAKey.from_private_key(f))
+        return keys
+
+    @logwrap
+    def assert_node_service_list(self, node_name, smiles_count):
+        ip = self.fuel_web.get_nailgun_node_by_devops_node(
+            self.get_virtual_environment().node_by_name(node_name))['ip']
+        remote = SSHClient(ip, username='root', password='r00tme',
+                           private_keys=self.get_private_keys())
+        assert_service_list(remote, smiles_count)
+
+    def verify_network_configuration(self, node):
+        verify_network_configuration(
+            node=node, private_keys=self.get_private_keys())
+
     def get_admin_node_ip(self):
         return str(
             self.nodes().admin.get_ip_address_by_network_name('internal'))
+
+    def get_virtual_environment(self):
+        """
+        :rtype : devops.models.Environment
+        """
+        if self._virtual_environment is None:
+            self._virtual_environment = self._get_or_create()
+        return self._virtual_environment
 
     def _get_or_create(self):
         try:
             return self.manager.environment_get(self.env_name())
         except:
-            self._environment = self.describe_environment()
-            self._environment.define()
-            return self._environment
+            self._virtual_environment = self.describe_environment()
+            self._virtual_environment.define()
+            return self._virtual_environment
 
-    def get_state(self, name):
-        if self.environment().has_snapshot(name):
-            self.environment().revert(name)
-            return True
-        return False
-
-    def get_active_state(self, name):
-        if self.environment().has_snapshot(name):
-            self.environment().revert(name)
-            self.environment().resume()
+    def revert_snapshot(self, name):
+        if self.get_virtual_environment().has_snapshot(name):
+            self.get_virtual_environment().revert(name)
+            self.get_virtual_environment().resume()
             return True
         return False
 
     def make_snapshot(self, snapshot_name):
-        self.environment().suspend(verbose=False)
-        self.environment().snapshot(snapshot_name)
-
-    def environment(self):
-        """
-        :rtype : devops.models.Environment
-        """
-        self._environment = self._environment or self._get_or_create()
-        return self._environment
+        self.get_virtual_environment().suspend(verbose=False)
+        self.get_virtual_environment().snapshot(snapshot_name)
 
     def nodes(self):
-        return Nodes(self.environment(), self.node_roles())
+        return Nodes(self.get_virtual_environment(), self.node_roles)
 
     # noinspection PyShadowingBuiltins
     def add_empty_volume(self, node, name, capacity=20 * 1024 * 1024 * 1024,
@@ -100,7 +126,7 @@ class EnvironmentModel(object):
             node=node,
             volume=self.manager.volume_create(
                 name=name, capacity=capacity,
-                environment=self.environment(),
+                environment=self.get_virtual_environment(),
                 format=format),
             device=device, bus=bus)
 
@@ -108,7 +134,7 @@ class EnvironmentModel(object):
         return self.manager.node_create(
             name=name,
             memory=memory,
-            environment=self.environment(),
+            environment=self.get_virtual_environment(),
             boot=boot)
 
     def create_interfaces(self, networks, node):
@@ -138,54 +164,16 @@ class EnvironmentModel(object):
 
         return node
 
-    def get_empty_environment(self):
-        if not(self.get_state(EMPTY_SNAPSHOT)):
-            self.setup_environment()
-            self.environment().snapshot(EMPTY_SNAPSHOT)
-
-    def generate_state_hash(self, settings):
-        return hashlib.md5(str(settings)).hexdigest()
-
-    def revert_to_state(self, settings={}):
-        state_hash = self.generate_state_hash(settings)
-
-        if state_hash in self.saved_environment_states:
-            # revert to matching state
-            state = self.saved_environment_states[state_hash]
-            if not(self.get_state(state['snapshot_name'])):
-                return False
-            self.environment().resume()
-            return True
-
-        return False
-
-    def snapshot_state(self, name, settings={}):
-        state_hash = self.generate_state_hash(settings)
-
-        snapshot_name = '{0}_{1}'.format(
-            name.replace(' ', '_')[:17], state_hash)
-
-        self.environment().suspend(verbose=False)
-        self.environment().snapshot(
-            name=snapshot_name,
-            description=name,
-            force=True,
-        )
-        self.environment().resume(verbose=False)
-        self.saved_environment_states[state_hash] = {
-            'snapshot_name': snapshot_name,
-            'cluster_name': name,
-            'settings': settings
-        }
-
     def internal_virtual_ip(self):
         return str(IPNetwork(
-            self.environment().network_by_name('internal').ip_network)[-2])
+            self.get_virtual_environment().network_by_name('internal').
+            ip_network)[-2])
 
     def public_router(self):
         return str(
             IPNetwork(
-                self.environment().network_by_name('public').ip_network)[1])
+                self.get_virtual_environment().network_by_name('public').
+                ip_network)[1])
 
     def internal_router(self):
         return self._router('internal')
@@ -196,7 +184,8 @@ class EnvironmentModel(object):
     def _router(self, router_name):
         return str(
             IPNetwork(
-                self.environment().network_by_name(router_name).ip_network)[1])
+                self.get_virtual_environment().network_by_name(router_name).
+                ip_network)[1])
 
     def get_host_node_ip(self):
         return self.internal_router()
@@ -204,19 +193,24 @@ class EnvironmentModel(object):
     def internal_network(self):
         return str(
             IPNetwork(
-                self.environment().network_by_name('internal').ip_network))
+                self.get_virtual_environment().network_by_name('internal').
+                ip_network))
 
     def internal_net_mask(self):
         return str(IPNetwork(
-            self.environment().network_by_name('internal').ip_network).netmask)
+            self.get_virtual_environment().network_by_name('internal').
+            ip_network).netmask)
 
     def public_net_mask(self):
         return str(IPNetwork(
-            self.environment().network_by_name('public').ip_network).netmask)
+            self.get_virtual_environment().network_by_name('public').
+            ip_network).netmask)
 
     def public_network(self):
         return str(
-            IPNetwork(self.environment().network_by_name('public').ip_network))
+            IPNetwork(
+                self.get_virtual_environment().network_by_name('public').
+                ip_network))
 
     @property
     def node_roles(self):
@@ -224,6 +218,32 @@ class EnvironmentModel(object):
             admin_names=['admin'],
             other_names=['slave-%02d' % x for x in range(1, 10)]
         )
+
+    @logwrap
+    def bootstrap_nodes(self, devops_nodes, timeout=600):
+        """
+        Start vms and wait they are registered on nailgun.
+        :rtype : List of registered nailgun nodes
+        """
+        for node in devops_nodes:
+            node.start()
+        wait(lambda: all(self.nailgun_nodes(devops_nodes)), 15, timeout)
+        return self.nailgun_nodes(devops_nodes)
+
+    def nailgun_nodes(self, devops_nodes):
+        return map(lambda node: self.get_node_by_devops_node(node),
+                   devops_nodes)
+
+    def devops_nodes_by_names(self, devops_node_names):
+        return map(
+            lambda name:
+            self.get_virtual_environment().node_by_name(name),
+            devops_node_names)
+
+    @logwrap
+    def add_syslog_server(self, cluster_id, nodes_dict, port=5514):
+        self.fuel_web.add_syslog_server(
+            cluster_id, self.get_host_node_ip(), port)
 
     @property
     def env_name(self):
@@ -244,9 +264,9 @@ class EnvironmentModel(object):
                 name=name, environment=environment, pool=pool,
                 forward=FORWARDING.get(name), has_dhcp_server=DHCP.get(name)))
 
-        for name in self.node_roles().admin_names:
+        for name in self.node_roles.admin_names:
             self.describe_admin_node(name, networks)
-        for name in self.node_roles().other_names:
+        for name in self.node_roles.other_names:
             self.describe_empty_node(name, networks, memory=1024)
         return environment
 
@@ -314,7 +334,7 @@ class EnvironmentModel(object):
         # start admin node
         admin = self.nodes().admin
         admin.disk_devices.get(device='cdrom').volume.upload(ISO_PATH)
-        self.environment().start(self.nodes().admins)
+        self.get_virtual_environment().start(self.nodes().admins)
         # update network parameters at boot screen
         time.sleep(30)
         admin.send_keys(self.get_keys(admin))
@@ -323,6 +343,20 @@ class EnvironmentModel(object):
         self.wait_bootstrap()
         time.sleep(10)
         self.enable_nat_for_admin_node()
+
+    @staticmethod
+    @logwrap
+    def get_target_devs(devops_nodes):
+        return [
+            interface.target_dev for interface in [
+                val for var in map(lambda node: node.interfaces, devops_nodes)
+                for val in var]]
+
+    @logwrap
+    def get_ebtables(self, cluster_id, devops_nodes):
+        return Ebtables(
+            self.get_target_devs(devops_nodes),
+            self.fuel_web.client.get_cluster_vlans(cluster_id))
 
 
 class NodeRoles(object):

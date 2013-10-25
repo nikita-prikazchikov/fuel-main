@@ -12,7 +12,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-
 import functools
 import json
 import logging
@@ -58,8 +57,8 @@ def log_snapshot_on_error(func):
                 )
             )
             if args[0].ci() is not None:
-                args[0].ci().environment().suspend(verbose=False)
-                args[0].ci().environment().snapshot(
+                args[0].ci().get_virtual_environment().suspend(verbose=False)
+                args[0].ci().get_virtual_environment().snapshot(
                     name=name[-50:],
                     description=description,
                     force=True,
