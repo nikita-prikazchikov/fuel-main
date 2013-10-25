@@ -64,7 +64,6 @@ class FuelWebModel(object):
         self.client.add_syslog_server(
             cluster_id, self.environment.get_host_node_ip(), port)
 
-
     def deploy_cluster_wait(self, cluster_id):
         task = self.deploy_cluster(cluster_id)
         self.assert_task_success(task)
