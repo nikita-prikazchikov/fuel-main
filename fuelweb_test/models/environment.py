@@ -49,6 +49,9 @@ class EnvironmentModel(object):
 
     @property
     def fuel_web(self):
+        """
+        :rtype: FuelWebModel
+        """
         return self._fuel_web
 
     def remote(self):

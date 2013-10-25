@@ -28,6 +28,9 @@ from fuelweb_test.settings import *
 logger = logging.getLogger(__name__)
 logwrap = debug(logger)
 
+DEPLOYMENT_MODE_SIMPLE = "multinode"
+DEPLOYMENT_MODE_HA = "ha_compact"
+
 
 class FuelWebModel(object):
 
@@ -59,49 +62,9 @@ class FuelWebModel(object):
     def add_syslog_server(self, cluster_id, host, port):
         self.client.add_syslog_server(cluster_id, host, port)
 
-    @logwrap
-    def basic_cluster_setup(self, cluster_id, port=5514):
-        self.client.add_syslog_server(
-            cluster_id, self.environment.get_host_node_ip(), port)
-
     def deploy_cluster_wait(self, cluster_id):
         task = self.deploy_cluster(cluster_id)
         self.assert_task_success(task)
-
-    @logwrap
-    def prepare_environment(self, name='cluster_name', mode="multinode",
-                            settings=None, save_state=True):
-        if not(self.ci().revert_to_state(settings)):
-            self.get_ready_environment()
-            if settings is None:
-                return None
-
-            net_provider = None
-            net_segment_type = None
-
-            if 'net_provider' in settings:
-                net_provider = settings['net_provider']
-
-            if 'net_segment_type' in settings:
-                net_segment_type = settings['net_segment_type']
-
-            if 'nodes' in settings:
-                cluster_id = self.create_cluster(
-                    name=name, mode=mode,
-                    net_provider=net_provider,
-                    net_segment_type=net_segment_type
-                )
-                self.other_cluster_settings(cluster_id, settings)
-                self.basic_provisioning(cluster_id, settings['nodes'])
-
-            if save_state:
-                self.ci().snapshot_state(name, settings)
-
-        # return id of last created cluster
-        clusters = self.client.list_clusters()
-        if len(clusters) > 0:
-            return clusters.pop()['id']
-        return None
 
     @logwrap
     def get_last_created_cluster(self):
@@ -110,21 +73,6 @@ class FuelWebModel(object):
         if len(clusters) > 0:
             return clusters.pop()['id']
         return None
-
-    @logwrap
-    def other_cluster_settings(self, cluster_id, settings):
-        attributes = self.client.get_cluster_attributes(cluster_id)
-        for option in settings:
-            section = False
-            if option in ('savanna', 'murano'):
-                section = 'additional_components'
-            if option in ('volumes_ceph', 'images_ceph'):
-                section = 'storage'
-            if section:
-                attributes['editable'][section][option]['value'] =\
-                    settings[option]
-
-        self.client.update_cluster_attributes(cluster_id, attributes)
 
     @logwrap
     def get_nailgun_node_roles(self, nodes_dict):
@@ -217,8 +165,12 @@ class FuelWebModel(object):
         return release_id
 
     @logwrap
-    def create_cluster(self, name='default', release_id=None, mode="multinode",
-                       net_provider=None, net_segment_type=None, port=5514):
+    def create_cluster(self,
+                       name,
+                       settings,
+                       release_id=None,
+                       mode=DEPLOYMENT_MODE_SIMPLE,
+                       port=5514):
         """
         :param name:
         :param release_id:
@@ -227,6 +179,7 @@ class FuelWebModel(object):
         """
         if not release_id:
             release_id = self._upload_sample_release()
+
         cluster_id = self.client.get_cluster_id(name)
         if not cluster_id:
             data = {
@@ -235,16 +188,30 @@ class FuelWebModel(object):
                 "mode": mode
             }
 
-            if net_provider:
+            if "net_provider" in settings:
                 data.update(
                     {
-                        'net_provider': net_provider,
-                        'net_segment_type': net_segment_type
+                        'net_provider': settings["net_provider"],
+                        'net_segment_type': settings["net_segment_type"]
                     }
                 )
 
             self.client.create_cluster(data=data)
             cluster_id = self.client.get_cluster_id(name)
+
+            attributes = self.client.get_cluster_attributes(cluster_id)
+
+            for option in settings:
+                section = False
+                if option in ('savanna', 'murano'):
+                    section = 'additional_components'
+                if option in ('volumes_ceph', 'images_ceph'):
+                    section = 'storage'
+                if section:
+                    attributes['editable'][section][option]['value'] =\
+                        settings[option]
+
+            self.client.update_cluster_attributes(cluster_id, attributes)
 
         if not cluster_id:
             raise Exception("Could not get cluster '%s'" % name)

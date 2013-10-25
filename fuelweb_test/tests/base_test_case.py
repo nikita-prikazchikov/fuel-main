@@ -7,24 +7,22 @@ from fuelweb_test.settings import *
 logger = logging.getLogger(__name__)
 logwrap = debug(logger)
 
-DEPLOYMENT_MODE_SIMPLE = "multinode"
-
 
 class TestBasic(object):
 
     def __init__(self):
-        self.environment = EnvironmentModel()
-        self.fuel_web = self.environment.fuel_web
+        self.env = EnvironmentModel()
+        self.fuel_web = self.env.fuel_web
         super(TestBasic, self).__init__()
 
     @test(groups=["thread_1"])
     def setup_master(self):
-        self.environment.setup_environment()
-        self.environment.make_snapshot(EMPTY_SNAPSHOT)
+        self.env.setup_environment()
+        self.env.make_snapshot(EMPTY_SNAPSHOT)
 
     @test(groups=["thread_1"], depends_on=[setup_master])
     def prepare_release(self):
-        self.ci().revert_snapshot(EMPTY_SNAPSHOT)
+        self.env.revert_snapshot(EMPTY_SNAPSHOT)
 
         if OPENSTACK_RELEASE == OPENSTACK_RELEASE_REDHAT:
             self.fuel_web.update_redhat_credentials()
@@ -32,10 +30,10 @@ class TestBasic(object):
                 OPENSTACK_RELEASE_REDHAT,
                 state='available'
             )
-        self.environment.make_snapshot("ready")
+        self.env.make_snapshot("ready")
 
     @test(groups=["thread_1"], depends_on=[prepare_release])
     def prepare_slaves(self):
-        self.ci().revert_snapshot("ready")
-        self.bootstrap_nodes(self.nodes().slaves[:3])
-        self.ci().make_snapshot("ready_with_3_slaves")
+        self.env.revert_snapshot("ready")
+        self.env.bootstrap_nodes(self.env.nodes().slaves[:3])
+        self.env.make_snapshot("ready_with_3_slaves")
