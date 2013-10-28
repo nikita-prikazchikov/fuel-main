@@ -167,7 +167,7 @@ class FuelWebModel(object):
     @logwrap
     def create_cluster(self,
                        name,
-                       settings,
+                       settings=None,
                        release_id=None,
                        mode=DEPLOYMENT_MODE_SIMPLE,
                        port=5514):
@@ -179,6 +179,9 @@ class FuelWebModel(object):
         """
         if not release_id:
             release_id = self._upload_sample_release()
+
+        if settings is None:
+            settings = {}
 
         cluster_id = self.client.get_cluster_id(name)
         if not cluster_id:

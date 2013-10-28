@@ -43,9 +43,9 @@ class EnvironmentModel(object):
     puppet_timeout = 1000
 
     def __init__(self):
+        self._virtual_environment = None
         self.manager = Manager()
         self._fuel_web = FuelWebModel(self.get_admin_node_ip(), self)
-        self._virtual_environment = None
 
     @property
     def fuel_web(self):
@@ -102,7 +102,7 @@ class EnvironmentModel(object):
 
     def _get_or_create(self):
         try:
-            return self.manager.environment_get(self.env_name())
+            return self.manager.environment_get(self.env_name)
         except:
             self._virtual_environment = self.describe_environment()
             self._virtual_environment.define()
@@ -234,8 +234,10 @@ class EnvironmentModel(object):
         return self.nailgun_nodes(devops_nodes)
 
     def nailgun_nodes(self, devops_nodes):
-        return map(lambda node: self.get_node_by_devops_node(node),
-                   devops_nodes)
+        return map(
+            lambda node: self.fuel_web.get_nailgun_node_by_devops_node(node),
+            devops_nodes
+        )
 
     def devops_nodes_by_names(self, devops_node_names):
         return map(
@@ -256,7 +258,7 @@ class EnvironmentModel(object):
         """
         :rtype : Environment
         """
-        environment = self.manager.environment_create(self.env_name())
+        environment = self.manager.environment_create(self.env_name)
         networks = []
         for name in INTERFACE_ORDER:
             ip_networks = [IPNetwork(x) for x in POOLS.get(name)[0].split(',')]
@@ -339,7 +341,7 @@ class EnvironmentModel(object):
         admin.disk_devices.get(device='cdrom').volume.upload(ISO_PATH)
         self.get_virtual_environment().start(self.nodes().admins)
         # update network parameters at boot screen
-        time.sleep(30)
+        time.sleep(float(ADMIN_NODE_SETUP_TIMEOUT))
         admin.send_keys(self.get_keys(admin))
         # wait while installation complete
         admin.await('internal', timeout=10 * 60)

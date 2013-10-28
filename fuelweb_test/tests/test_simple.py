@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 logwrap = debug(logger)
 
 
+@test
 class TestSimpleFlat(TestBasic):
     @test(groups=["thread_1"], depends_on=[TestBasic.prepare_slaves])
     def simple_flat_deploy(self):

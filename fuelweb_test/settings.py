@@ -38,6 +38,8 @@ NAT_FORWARD = os.environ.get('NAT_FORWARD', 'nat')
 
 ENV_NAME = os.environ.get("ENV_NAME", "fuel_system_test")
 
+ADMIN_NODE_SETUP_TIMEOUT = os.environ.get("ADMIN_NODE_SETUP_TIMEOUT", 30)
+
 FORWARDING = {
     'public': PUBLIC_FORWARD,
     'internal': None,
