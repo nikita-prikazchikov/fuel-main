@@ -57,36 +57,25 @@ def log_snapshot_on_error(func):
                 )
             )
             if args[0].ci() is not None:
-                args[0].ci().get_virtual_environment().suspend(verbose=False)
-                args[0].ci().get_virtual_environment().snapshot(
-                    name=name[-50:],
-                    description=description,
-                    force=True,
-                )
+                args[0].env.make_snapshot(name=name[-50:])
             raise
         finally:
             if LOGS_DIR:
                 if not os.path.exists(LOGS_DIR):
                     os.makedirs(LOGS_DIR)
 
-                environment = args[0]
-                task = environment.client.generate_logs()
-                task = environment._task_wait(task, 60 * 5)
+                env = args[0].env
+                task = env.fuel_web.client.generate_logs()
+                task = env.fuel_web.task_wait(task, 60 * 5)
                 url = "http://{}:8000{}".format(
-                    environment.get_admin_node_ip(), task['message']
+                    env.get_admin_node_ip(), task['message']
                 )
-                save_logs(
-                    url,
-                    os.path.join(
-                        LOGS_DIR,
-                        '{status}_{name}-{time}.tar.gz'.format(
-                            status=status,
-                            name=func.__name__,
-                            time=time.strftime(
-                                "%Y_%m_%d__%H_%M_%S", time.gmtime())
-                        )
-                    )
+                log_file_name = '{status}_{name}-{time}.tar.gz'.format(
+                    status=status,
+                    name=func.__name__,
+                    time=time.strftime("%Y_%m_%d__%H_%M_%S", time.gmtime())
                 )
+                save_logs(url, os.path.join(LOGS_DIR, log_file_name))
     return wrapper
 
 
