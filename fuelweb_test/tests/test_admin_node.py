@@ -13,14 +13,14 @@
 #    under the License.
 
 import logging
-import unittest
 import xmlrpclib
 from devops.helpers.helpers import wait, tcp_ping, http
 
-from proboscis import test
+from proboscis import test, SkipTest
 from proboscis.asserts import assert_equal
 
 from fuelweb_test.helpers.decorators import debug, log_snapshot_on_error
+from fuelweb_test.settings import OPENSTACK_RELEASE, OPENSTACK_RELEASE_CENTOS
 from fuelweb_test.tests.base_test_case import TestBasic
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,9 @@ logwrap = debug(logger)
 class TestAdminNode(TestBasic):
     @logwrap
     @test(groups=["thread_1"], depends_on=[TestBasic.setup_master])
-    def test_puppetmaster_alive(self):
+    def test_puppet_master_alive(self):
+        if OPENSTACK_RELEASE != OPENSTACK_RELEASE_CENTOS:
+            raise SkipTest()
         self.env.revert_snapshot("empty")
         wait(
             lambda: tcp_ping(self.env.get_admin_node_ip(), 8140),
@@ -48,6 +50,8 @@ class TestAdminNode(TestBasic):
     @logwrap
     @test(groups=["thread_1"], depends_on=[TestBasic.setup_master])
     def test_cobbler_alive(self):
+        if OPENSTACK_RELEASE != OPENSTACK_RELEASE_CENTOS:
+            raise SkipTest()
         self.env.revert_snapshot("empty")
         wait(
             lambda: http(host=self.env.get_admin_node_ip(), url='/cobbler_api',
@@ -63,6 +67,8 @@ class TestAdminNode(TestBasic):
     @log_snapshot_on_error
     @test(groups=["thread_1"], depends_on=[TestBasic.setup_master])
     def test_nailyd_alive(self):
+        if OPENSTACK_RELEASE != OPENSTACK_RELEASE_CENTOS:
+            raise SkipTest()
         self.env.revert_snapshot("empty")
         ps_output = self.env.remote().execute('ps ax')['stdout']
         naily_master = filter(lambda x: 'naily master' in x, ps_output)
@@ -73,6 +79,3 @@ class TestAdminNode(TestBasic):
             "Found %d naily worker processes: %s" %
             (len(naily_workers), naily_workers))
         assert_equal(True, len(naily_workers) > 1)
-
-if __name__ == '__main__':
-    unittest.main()
