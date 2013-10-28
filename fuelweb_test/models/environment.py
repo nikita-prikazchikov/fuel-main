@@ -44,6 +44,7 @@ class EnvironmentModel(object):
 
     def __init__(self):
         self._virtual_environment = None
+        self._keys = None
         self.manager = Manager()
         self._fuel_web = FuelWebModel(self.get_admin_node_ip(), self)
 
@@ -69,12 +70,14 @@ class EnvironmentModel(object):
                          private_keys=self.get_private_keys())
 
     @logwrap
-    def get_private_keys(self):
-        keys = []
-        for key_string in ['/root/.ssh/id_rsa', '/root/.ssh/bootstrap.rsa']:
-            with self.remote().open(key_string) as f:
-                keys.append(RSAKey.from_private_key(f))
-        return keys
+    def get_private_keys(self, force=False):
+        if force or self._keys is None:
+            self._keys = []
+            for key_string in ['/root/.ssh/id_rsa',
+                               '/root/.ssh/bootstrap.rsa']:
+                with self.remote().open(key_string) as f:
+                    self._keys.append(RSAKey.from_private_key(f))
+        return self._keys
 
     @logwrap
     def assert_node_service_list(self, node_name, smiles_count):
