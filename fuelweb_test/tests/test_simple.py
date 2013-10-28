@@ -1,10 +1,23 @@
+#    Copyright 2013 Mirantis, Inc.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
 import logging
 from proboscis import test, SkipTest
 
-from fuelweb_test.helpers.decorators import debug
+from fuelweb_test.helpers.decorators import debug, log_snapshot_on_error
 from fuelweb_test.models.fuel_web_client import DEPLOYMENT_MODE_SIMPLE
 from fuelweb_test.tests.base_test_case import TestBasic
-
 
 logger = logging.getLogger(__name__)
 logwrap = debug(logger)
@@ -12,6 +25,7 @@ logwrap = debug(logger)
 
 @test
 class TestSimpleFlat(TestBasic):
+    @log_snapshot_on_error
     @test(groups=["thread_1"], depends_on=[TestBasic.prepare_slaves])
     def simple_flat_deploy(self):
         self.env.revert_snapshot("ready_with_3_slaves")
@@ -32,6 +46,7 @@ class TestSimpleFlat(TestBasic):
             'slave-01', smiles_count=6, networks_count=1, timeout=300)
         self.env.make_snapshot("deploy_simple_flat")
 
+    @log_snapshot_on_error
     @test(groups=["thread_1"], depends_on=[simple_flat_deploy])
     def simple_flat_verify_networks(self):
         self.env.revert_snapshot("deploy_simple_flat")
@@ -42,6 +57,7 @@ class TestSimpleFlat(TestBasic):
             self.fuel_web.get_last_created_cluster())
         self.fuel_web.assert_task_success(task, 60 * 2, interval=10)
 
+    @log_snapshot_on_error
     @test(groups=["thread_1"], depends_on=[simple_flat_deploy])
     def simple_flat_ostf(self):
         self.env.revert_snapshot("deploy_simple_flat")

@@ -16,8 +16,6 @@
 import os
 
 ISO_PATH = os.environ.get('ISO_PATH')
-EMPTY_SNAPSHOT = os.environ.get('EMPTY_SNAPSHOT', 'empty')
-READY_SNAPSHOT = os.environ.get('READY_SNAPSHOT', 'ready')
 
 OPENSTACK_RELEASE_CENTOS = 'Grizzly on CentOS 6.4'
 OPENSTACK_RELEASE_UBUNTU = 'Grizzly on Ubuntu 12.04'
@@ -84,7 +82,5 @@ NETWORK_MANAGERS = {
     'vlan': 'VlanManager'
 }
 
-CLEAN = os.environ.get('CLEAN', 'true') == 'true'
 LOGS_DIR = os.environ.get('LOGS_DIR')
-
 USE_ALL_DISKS = os.environ.get('USE_ALL_DISKS', 'true') == 'true'
