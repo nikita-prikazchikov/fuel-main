@@ -27,7 +27,7 @@ from devops.helpers.helpers import wait, SSHClient
 from fuelweb_test.helpers.ci import *
 from fuelweb_test.helpers.decorators import debug
 from fuelweb_test.helpers.eb_tables import Ebtables
-from fuelweb_test.models.fuel_web_model import FuelWebModel
+from fuelweb_test.models.fuel_web_client import FuelWebClient
 from fuelweb_test.settings import *
 
 
@@ -46,12 +46,12 @@ class EnvironmentModel(object):
         self._virtual_environment = None
         self._keys = None
         self.manager = Manager()
-        self._fuel_web = FuelWebModel(self.get_admin_node_ip(), self)
+        self._fuel_web = FuelWebClient(self.get_admin_node_ip(), self)
 
     @property
     def fuel_web(self):
         """
-        :rtype: FuelWebModel
+        :rtype: FuelWebClient
         """
         return self._fuel_web
 

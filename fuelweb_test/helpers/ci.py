@@ -57,7 +57,7 @@ def verify_network_configuration(node, private_keys):
 
 
 @logwrap
-def assert_service_list(self, remote, smiles_count):
+def assert_service_list(remote, smiles_count):
     ret = remote.check_call('/usr/bin/nova-manage service list')
     logger.debug("Service list: {}".format(ret['stdout']))
     assert_equal(

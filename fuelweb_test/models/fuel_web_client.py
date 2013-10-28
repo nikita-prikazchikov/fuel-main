@@ -32,13 +32,13 @@ DEPLOYMENT_MODE_SIMPLE = "multinode"
 DEPLOYMENT_MODE_HA = "ha_compact"
 
 
-class FuelWebModel(object):
+class FuelWebClient(object):
 
     def __init__(self, admin_node_ip, environment):
         self.admin_node_ip = admin_node_ip
         self.client = NailgunClient(admin_node_ip)
         self._environment = environment
-        super(FuelWebModel, self).__init__()
+        super(FuelWebClient, self).__init__()
 
     @property
     def environment(self):
@@ -64,7 +64,7 @@ class FuelWebModel(object):
 
     def deploy_cluster_wait(self, cluster_id):
         task = self.deploy_cluster(cluster_id)
-        self.assert_task_success(task)
+        self.assert_task_success(task, interval=30)
 
     @logwrap
     def get_last_created_cluster(self):
@@ -90,12 +90,18 @@ class FuelWebModel(object):
         return self.client.deploy_cluster_changes(cluster_id)
 
     @logwrap
-    def assert_task_success(self, task, timeout=90 * 60):
-        assert_equal('ready', self.task_wait(task, timeout)['status'])
+    def assert_task_success(self, task, timeout=90 * 60, interval=5):
+        assert_equal(
+            'ready',
+            self.task_wait(task, timeout, interval)['status']
+        )
 
     @logwrap
-    def assert_task_failed(self, task, timeout=70 * 60):
-        assert_equal('error', self.task_wait(task, timeout)['status'])
+    def assert_task_failed(self, task, timeout=70 * 60, interval=5):
+        assert_equal(
+            'error',
+            self.task_wait(task, timeout, interval)['status']
+        )
 
     @logwrap
     def assert_ostf_run(self, cluster_id, should_fail=0, should_pass=0,
@@ -137,11 +143,13 @@ class FuelWebModel(object):
         )
 
     @logwrap
-    def task_wait(self, task, timeout):
+    def task_wait(self, task, timeout, interval=5):
         wait(
             lambda: self.client.get_task(
                 task['id'])['status'] != 'running',
-            timeout=timeout)
+            interval=interval,
+            timeout=timeout
+        )
         return self.client.get_task(task['id'])
 
     @logwrap
@@ -277,11 +285,14 @@ class FuelWebModel(object):
     @logwrap
     def assert_cluster_ready(self, node_name, smiles_count,
                              networks_count=1, timeout=300):
+        remote = self.environment.get_ssh_to_remote(
+            self.get_nailgun_node_by_devops_node(
+                self.environment.get_virtual_environment().
+                node_by_name(node_name))['ip']
+        )
         _wait(
             lambda: self.get_cluster_status(
-                self.get_nailgun_node_by_devops_node(
-                    self.environment.get_virtual_environment().
-                    node_by_name(node_name))['ip'],
+                remote,
                 smiles_count=smiles_count,
                 networks_count=networks_count),
             timeout=timeout)
@@ -299,12 +310,12 @@ class FuelWebModel(object):
                            nodes_dict.keys()))[0]
         return self.get_ssh_for_node(node_name)
 
+    @staticmethod
     @logwrap
-    def get_cluster_status(self, ip, smiles_count, networks_count=1):
-        remote = self.environment.get_ssh_to_remote(ip)
-        assert_service_list(remote, smiles_count)
-        assert_glance_index(remote)
-        assert_network_list(networks_count, remote)
+    def get_cluster_status(ssh_remote, smiles_count, networks_count=1):
+        assert_service_list(ssh_remote, smiles_count)
+        assert_glance_index(ssh_remote)
+        assert_network_list(networks_count, ssh_remote)
 
     @logwrap
     def get_cluster_floating_list(self, node_name):

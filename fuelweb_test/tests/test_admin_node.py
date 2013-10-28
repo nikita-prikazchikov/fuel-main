@@ -18,7 +18,7 @@ import unittest
 import xmlrpclib
 from devops.helpers.helpers import wait, tcp_ping, http
 from nose.plugins.attrib import attr
-from fuelweb_test.models.fuel_web_model import Environment_Model
+from fuelweb_test.models.fuel_web_client import Environment_Model
 from fuelweb_test.helpers.decorators import debug, fetch_logs
 from fuelweb_test.settings import CLEAN
 

@@ -18,7 +18,7 @@ import unittest
 from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
 from fuelweb_test.helpers import Ebtables
-from fuelweb_test.models.fuel_web_model import Environment_Model
+from fuelweb_test.models.fuel_web_client import Environment_Model
 from fuelweb_test.helpers.decorators import debug, fetch_logs
 
 logging.basicConfig(

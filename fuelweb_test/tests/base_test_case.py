@@ -1,5 +1,5 @@
 import logging
-from proboscis import test
+from proboscis import test, SkipTest
 from fuelweb_test.models.environment import EnvironmentModel
 from fuelweb_test.helpers.decorators import debug
 from fuelweb_test.settings import *
