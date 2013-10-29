@@ -27,16 +27,7 @@ logwrap = debug(logger)
 class TestHaVLAN(TestBasic):
 
     @log_snapshot_on_error
-    @test(
-        groups=["thread_3", "thread_4"],
-        depends_on=[TestBasic.prepare_release]
-    )
-    def bootstrap_nodes(self):
-        self.env.bootstrap_nodes(self.env.nodes().slaves[:5])
-        self.env.make_snapshot("ready_with_5_slaves")
-
-    @log_snapshot_on_error
-    @test(groups=["thread_3"], depends_on=[bootstrap_nodes])
+    @test(groups=["thread_3"], depends_on=[TestBasic.prepare_5_slaves])
     def deploy_ha_vlan(self):
         self.env.revert_snapshot("ready_with_5_slaves")
 
@@ -89,7 +80,7 @@ class TestHaVLAN(TestBasic):
 class TestHaFlat(TestBasic):
 
     @log_snapshot_on_error
-    @test(groups=["thread_4"], depends_on=[TestHaVLAN.bootstrap_nodes])
+    @test(groups=["thread_4"], depends_on=[TestBasic.prepare_5_slaves])
     def deploy_ha_flat(self):
         self.env.revert_snapshot("ready_with_5_slaves")
 
