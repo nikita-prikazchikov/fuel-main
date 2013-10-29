@@ -95,3 +95,13 @@ def assert_glance_index(remote):
 def assert_network_list(networks_count, remote):
     ret = remote.check_call('/usr/bin/nova-manage network list')
     assert_equal(networks_count + 1, len(ret['stdout']))
+
+@logwrap
+def check_ceph_health(ssh):
+    # Check Ceph node disk configuration:
+    disks = ''.join(ssh.execute(
+        'ceph osd tree | grep osd')['stdout'])
+    assert_true('up' in disks)
+
+    result = ''.join(ssh.execute('ceph health')['stdout'])
+    assert_equal('HEALTH_OK', result)
