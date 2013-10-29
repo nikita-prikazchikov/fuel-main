@@ -12,107 +12,172 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-
 import logging
-from nose.plugins.attrib import attr
-from fuelweb_test.models.fuel_web_client import Environment_Model
-from fuelweb_test.helpers.decorators import snapshot_errors, \
-    debug, fetch_logs
 
-logging.basicConfig(
-    format=':%(lineno)d: %(asctime)s %(message)s',
-    level=logging.DEBUG
-)
+from proboscis import test, SkipTest
+
+from proboscis.asserts import assert_equal
+from fuelweb_test.models.fuel_web_client \
+    import DEPLOYMENT_MODE_SIMPLE, DEPLOYMENT_MODE_HA
+from fuelweb_test.helpers.decorators import debug, log_snapshot_on_error
+from fuelweb_test.settings import OPENSTACK_RELEASE, OPENSTACK_RELEASE_REDHAT
+from fuelweb_test.tests.base_test_case import TestBasic
 
 logger = logging.getLogger(__name__)
 logwrap = debug(logger)
 
 
-class TestNode(Environment_Model):
-    @snapshot_errors
-    @logwrap
-    @fetch_logs
-    @attr(releases=['centos', 'ubuntu'], test_thread='thread_3')
-    def test_neutron_gre(self):
+@test
+class NeutronGre(TestBasic):
+
+    @log_snapshot_on_error
+    @test(groups=["thread_3"], depends_on=[TestBasic.prepare_slaves])
+    def deploy_neutron_gre(self):
+
+        if OPENSTACK_RELEASE == OPENSTACK_RELEASE_REDHAT:
+            raise SkipTest()
+
+        self.env.revert_snapshot("ready_with_3_slaves")
+
         segment_type = 'gre'
-
-        self.prepare_environment()
-        cluster_id = self.create_cluster(
-            name='test_neutron_gre', mode="multinode",
-            net_provider='neutron', net_segment_type=segment_type)
-        self.basic_provisioning(cluster_id=cluster_id, nodes_dict={
-            'slave-01': ['controller'],
-            'slave-04': ['compute'],
-            'slave-05': ['compute']
-        })
+        cluster_id = self.fuel_web.create_cluster(
+            name=self.__class__.__name__,
+            mode=DEPLOYMENT_MODE_SIMPLE,
+            settings={
+                "net_provider": 'neutron',
+                "net_segment_type": segment_type
+            }
+        )
+        self.fuel_web.update_nodes(
+            cluster_id,
+            {
+                'slave-01': ['controller'],
+                'slave-04': ['compute'],
+                'slave-05': ['compute']
+            }
+        )
+        self.fuel_web.deploy_cluster_wait(cluster_id)
 
         cluster = self.client.get_cluster(cluster_id)
-        self.assertEqual(str(cluster['net_provider']), 'neutron')
-        self.assertEqual(str(cluster['net_segment_type']), segment_type)
+        assert_equal(str(cluster['net_provider']), 'neutron')
+        assert_equal(str(cluster['net_segment_type']), segment_type)
 
-    @snapshot_errors
-    @logwrap
-    @fetch_logs
-    @attr(releases=['centos', 'ubuntu'], test_thread='thread_3')
-    def test_neutron_vlan(self):
+        self.env.make_snapshot("deploy_neutron_gre")
+
+
+@test
+class NeutronVlan(TestBasic):
+
+    @log_snapshot_on_error
+    @test(groups=["thread_3"], depends_on=[TestBasic.prepare_slaves])
+    def deploy_neutron_vlan(self):
+
+        if OPENSTACK_RELEASE == OPENSTACK_RELEASE_REDHAT:
+            raise SkipTest()
+
+        self.env.revert_snapshot("ready_with_3_slaves")
+
         segment_type = 'vlan'
-
-        self.prepare_environment()
-        cluster_id = self.create_cluster(
-            name='test_neutron_vlan', mode="multinode",
-            net_provider='neutron', net_segment_type=segment_type)
-        self.basic_provisioning(cluster_id=cluster_id, nodes_dict={
-            'slave-01': ['controller'],
-            'slave-04': ['compute'],
-            'slave-05': ['compute']
-        })
+        cluster_id = self.fuel_web.create_cluster(
+            name=self.__class__.__name__,
+            mode=DEPLOYMENT_MODE_SIMPLE,
+            settings={
+                "net_provider": 'neutron',
+                "net_segment_type": segment_type
+            }
+        )
+        self.fuel_web.update_nodes(
+            cluster_id,
+            {
+                'slave-01': ['controller'],
+                'slave-04': ['compute'],
+                'slave-05': ['compute']
+            }
+        )
+        self.fuel_web.deploy_cluster_wait(cluster_id)
 
         cluster = self.client.get_cluster(cluster_id)
-        self.assertEqual(str(cluster['net_provider']), 'neutron')
-        self.assertEqual(str(cluster['net_segment_type']), segment_type)
+        assert_equal(str(cluster['net_provider']), 'neutron')
+        assert_equal(str(cluster['net_segment_type']), segment_type)
 
-    @snapshot_errors
-    @logwrap
-    @fetch_logs
-    @attr(releases=['centos', 'ubuntu'], test_thread='thread_3')
-    def test_neutron_gre_ha(self):
+        self.env.make_snapshot("deploy_neutron_vlan")
+
+
+@test
+class NeutronGreHa(TestBasic):
+
+    @log_snapshot_on_error
+    @test(groups=["thread_3"], depends_on=[TestBasic.prepare_5_slaves])
+    def deploy_neutron_gre_ha(self):
+
+        if OPENSTACK_RELEASE == OPENSTACK_RELEASE_REDHAT:
+            raise SkipTest()
+
+        self.env.revert_snapshot("ready_with_5_slaves")
+
         segment_type = 'gre'
-
-        self.prepare_environment()
-        cluster_id = self.create_cluster(
-            name='test_neutron_gre_ha', mode="ha_compact",
-            net_provider='neutron', net_segment_type=segment_type)
-        self.basic_provisioning(cluster_id=cluster_id, nodes_dict={
-            'slave-01': ['controller'],
-            'slave-02': ['controller'],
-            'slave-03': ['controller'],
-            'slave-04': ['compute'],
-            'slave-05': ['compute']
-        })
+        cluster_id = self.fuel_web.create_cluster(
+            name=self.__class__.__name__,
+            mode=DEPLOYMENT_MODE_HA,
+            settings={
+                "net_provider": 'neutron',
+                "net_segment_type": segment_type
+            }
+        )
+        self.fuel_web.update_nodes(
+            cluster_id,
+            {
+                'slave-01': ['controller'],
+                'slave-02': ['controller'],
+                'slave-03': ['controller'],
+                'slave-04': ['compute'],
+                'slave-05': ['compute']
+            }
+        )
+        self.fuel_web.deploy_cluster_wait(cluster_id)
 
         cluster = self.client.get_cluster(cluster_id)
-        self.assertEqual(str(cluster['net_provider']), 'neutron')
-        self.assertEqual(str(cluster['net_segment_type']), segment_type)
+        assert_equal(str(cluster['net_provider']), 'neutron')
+        assert_equal(str(cluster['net_segment_type']), segment_type)
 
-    @snapshot_errors
-    @logwrap
-    @fetch_logs
-    @attr(releases=['centos', 'ubuntu'], test_thread='thread_3')
-    def test_neutron_vlan_ha(self):
+        self.env.make_snapshot("deploy_neutron_gre_ha")
+
+
+@test
+class NeutronVlanHa(TestBasic):
+
+    @log_snapshot_on_error
+    @test(groups=["thread_3"], depends_on=[TestBasic.prepare_5_slaves])
+    def deploy_neutron_vlan_ha(self):
+
+        if OPENSTACK_RELEASE == OPENSTACK_RELEASE_REDHAT:
+            raise SkipTest()
+
+        self.env.revert_snapshot("ready_with_5_slaves")
+
         segment_type = 'vlan'
-
-        self.prepare_environment()
-        cluster_id = self.create_cluster(
-            name='test_neutron_vlan_ha', mode="ha_compact",
-            net_provider='neutron', net_segment_type=segment_type)
-        self.basic_provisioning(cluster_id=cluster_id, nodes_dict={
-            'slave-01': ['controller'],
-            'slave-02': ['controller'],
-            'slave-03': ['controller'],
-            'slave-04': ['compute'],
-            'slave-05': ['compute']
-        })
+        cluster_id = self.fuel_web.create_cluster(
+            name=self.__class__.__name__,
+            mode=DEPLOYMENT_MODE_HA,
+            settings={
+                "net_provider": 'neutron',
+                "net_segment_type": segment_type
+            }
+        )
+        self.fuel_web.update_nodes(
+            cluster_id,
+            {
+                'slave-01': ['controller'],
+                'slave-02': ['controller'],
+                'slave-03': ['controller'],
+                'slave-04': ['compute'],
+                'slave-05': ['compute']
+            }
+        )
+        self.fuel_web.deploy_cluster_wait(cluster_id)
 
         cluster = self.client.get_cluster(cluster_id)
-        self.assertEqual(str(cluster['net_provider']), 'neutron')
-        self.assertEqual(str(cluster['net_segment_type']), segment_type)
+        assert_equal(str(cluster['net_provider']), 'neutron')
+        assert_equal(str(cluster['net_segment_type']), segment_type)
+
+        self.env.make_snapshot("deploy_neutron_vlan_ha")
