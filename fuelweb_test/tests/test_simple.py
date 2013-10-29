@@ -24,10 +24,10 @@ logwrap = debug(logger)
 
 
 @test
-class TestSimpleFlat(TestBasic):
+class SimpleFlat(TestBasic):
     @log_snapshot_on_error
     @test(groups=["thread_1"], depends_on=[TestBasic.prepare_slaves])
-    def simple_flat_deploy(self):
+    def deploy_simple_flat(self):
         self.env.revert_snapshot("ready_with_3_slaves")
 
         cluster_id = self.fuel_web.create_cluster(
@@ -47,7 +47,7 @@ class TestSimpleFlat(TestBasic):
         self.env.make_snapshot("deploy_simple_flat")
 
     @log_snapshot_on_error
-    @test(groups=["thread_1"], depends_on=[simple_flat_deploy])
+    @test(groups=["thread_1"], depends_on=[deploy_simple_flat])
     def simple_flat_verify_networks(self):
         self.env.revert_snapshot("deploy_simple_flat")
 
@@ -58,7 +58,7 @@ class TestSimpleFlat(TestBasic):
         self.fuel_web.assert_task_success(task, 60 * 2, interval=10)
 
     @log_snapshot_on_error
-    @test(groups=["thread_1"], depends_on=[simple_flat_deploy])
+    @test(groups=["thread_1"], depends_on=[deploy_simple_flat])
     def simple_flat_ostf(self):
         self.env.revert_snapshot("deploy_simple_flat")
 
@@ -69,7 +69,7 @@ class TestSimpleFlat(TestBasic):
 
 
 @test
-class TestSimpleFlat(TestBasic):
+class UntaggedNetworksNegative(TestBasic):
     @log_snapshot_on_error
     @test(groups=["thread_1"], depends_on=[TestBasic.prepare_slaves])
     def untagged_networks_negative(self):
