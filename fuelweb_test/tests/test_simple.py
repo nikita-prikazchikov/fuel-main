@@ -66,3 +66,50 @@ class TestSimpleFlat(TestBasic):
             cluster_id=self.fuel_web.get_last_created_cluster(),
             should_fail=5, should_pass=19
         )
+
+
+@test
+class TestSimpleFlat(TestBasic):
+    @log_snapshot_on_error
+    @test(groups=["thread_1"], depends_on=[TestBasic.prepare_slaves])
+    def untagged_networks_negative(self):
+        raise SkipTest()
+        self.env.revert_snapshot("ready_with_3_slaves")
+
+        vlan_turn_off = {'vlan_start': None}
+        interfaces = {
+            'eth0': ["fixed"],
+            'eth1': ["public", "floating"],
+            'eth2': ["management", "storage"],
+            'eth3': []
+        }
+
+        cluster_id = self.fuel_web.create_cluster(
+            name=self.__class__.__name__,
+        )
+        self.fuel_web.update_nodes(
+            cluster_id,
+            {
+                'slave-01': ['controller'],
+                'slave-02': ['compute']
+            }
+        )
+
+        nets = self.fuel_web.client.get_networks(cluster_id)['networks']
+        nailgun_nodes = self.fuel_web.client.list_cluster_nodes(cluster_id)
+        for node in nailgun_nodes:
+            self.fuel_web.update_node_networks(node['id'], interfaces)
+
+        # select networks that will be untagged:
+        [net.update(vlan_turn_off) for net in nets]
+
+        # stop using VLANs:
+        self.fuel_web.client.update_network(cluster_id, networks=nets)
+
+        # run network check:
+        task = self.fuel_web.run_network_verify(cluster_id)
+        self.fuel_web.assert_task_failed(task, 60 * 5)
+
+        # deploy cluster:
+        task = self.fuel_web.deploy_cluster(cluster_id)
+        self.fuel_web.assert_task_failed(task)
