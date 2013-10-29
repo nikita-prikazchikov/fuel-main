@@ -166,27 +166,21 @@ class FuelWebClient(object):
         return [self.task_wait(task, timeout) for task in tasks]
 
     @logwrap
-    def _upload_sample_release(self):
-        release_id = self.client.get_release_id()
-        if not release_id:
-            raise Exception("Not implemented uploading of release")
-        return release_id
-
-    @logwrap
     def create_cluster(self,
                        name,
                        settings=None,
-                       release_id=None,
+                       release_name=OPENSTACK_RELEASE,
                        mode=DEPLOYMENT_MODE_SIMPLE,
                        port=5514):
         """
         :param name:
-        :param release_id:
+        :param release_name:
         :param mode:
+        :param settings:
+        :param port:
         :return: cluster_id
         """
-        if not release_id:
-            release_id = self._upload_sample_release()
+        release_id = self.client.get_release_id(release_name=release_name)
 
         if settings is None:
             settings = {}
