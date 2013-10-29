@@ -59,6 +59,11 @@ class FuelWebClient(object):
             cluster_id, self.client.get_networks(cluster_id)['networks'])
 
     @logwrap
+    def verify_network(self, cluster_id):
+        task = self.run_network_verify(cluster_id)
+        self.assert_task_success(task, 60 * 2, interval=10)
+
+    @logwrap
     def add_syslog_server(self, cluster_id, host, port):
         self.client.add_syslog_server(cluster_id, host, port)
 
@@ -258,6 +263,11 @@ class FuelWebClient(object):
         assert_true(
             all([node_id in cluster_node_ids for node_id in node_ids]))
         return nailgun_nodes
+
+    @logwrap
+    def get_nailgun_node_by_name(self, node_name):
+        return self.get_nailgun_node_by_devops_node(
+            self.environment.get_virtual_environment().node_by_name(node_name))
 
     @logwrap
     def get_nailgun_node_by_devops_node(self, devops_node):

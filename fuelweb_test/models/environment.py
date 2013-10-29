@@ -91,9 +91,11 @@ class EnvironmentModel(object):
         remote = self.get_ssh_to_remote_by_name(node_name)
         assert_service_list(remote, smiles_count)
 
-    def verify_network_configuration(self, node):
+    def verify_network_configuration(self, node_name):
         verify_network_configuration(
-            node=node, private_keys=self.get_private_keys())
+            node=self.fuel_web.get_nailgun_node_by_name(node_name),
+            remote=self.get_ssh_to_remote_by_name(node_name)
+        )
 
     def get_admin_node_ip(self):
         return str(

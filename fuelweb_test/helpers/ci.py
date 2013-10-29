@@ -30,9 +30,7 @@ def get_interface_description(ctrl_ssh, interface_short_name):
     )
 
 
-def verify_network_configuration(node, private_keys):
-    remote = SSHClient(node['ip'], username='root', password='r00tme',
-                       private_keys=private_keys)
+def verify_network_configuration(remote, node):
     for interface in node['network_data']:
         if interface.get('vlan') is None:
             continue  # todo excess check fix interface json format
