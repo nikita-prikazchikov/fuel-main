@@ -70,6 +70,13 @@ class EnvironmentModel(object):
                          private_keys=self.get_private_keys())
 
     @logwrap
+    def get_ssh_to_remote_by_name(self, node_name):
+        return self.get_ssh_to_remote(
+            self.fuel_web.get_nailgun_node_by_devops_node(
+                self.get_virtual_environment().node_by_name(node_name))['ip']
+        )
+
+    @logwrap
     def get_private_keys(self, force=False):
         if force or self._keys is None:
             self._keys = []
@@ -81,10 +88,7 @@ class EnvironmentModel(object):
 
     @logwrap
     def assert_node_service_list(self, node_name, smiles_count):
-        ip = self.fuel_web.get_nailgun_node_by_devops_node(
-            self.get_virtual_environment().node_by_name(node_name))['ip']
-        remote = SSHClient(ip, username='root', password='r00tme',
-                           private_keys=self.get_private_keys())
+        remote = self.get_ssh_to_remote_by_name(node_name)
         assert_service_list(remote, smiles_count)
 
     def verify_network_configuration(self, node):
