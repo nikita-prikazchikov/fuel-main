@@ -1,0 +1,61 @@
+<div class="container-fluid">
+    <div class="row-fluid">
+        <div class="row-fluid">
+            <div class="span1">
+                <div class="btn-toolbar">
+                    <div class="btn-group">
+                        <a  href="#/view" class="btn btn-mini btn-inverse"><i class="icon-white icon-arrow-left"></i></a>
+                    </div>
+                </div>
+            </div>
+            <div class="span10">
+                <h4>Test cases</h4>
+            </div>
+        </div>
+        <div class="row-fluid">
+            <div class="well well-small">
+                <div class="form-inline">
+                    <label for="testSuiteId">Test suite</label>
+                    <select id="testSuiteId"
+                            ng-model="testCaseFilter.test_suite_name"
+                            ng-options="testCase.test_suite_name as testCase.test_suite_name for testCase in testCaseList | unique:'test_suite_name' | orderBy:'test_suite_name'"
+                            ng-change="testCaseFilter.test_suite_name = fixValue(testCaseFilter.test_suite_name)"
+                        >
+                        <option value=''>All</option>
+                    </select>
+                    <label for="status">Status</label>
+                    <select id="status"
+                            ng-model="testCaseFilter.status"
+                            ng-options="status for status in statusList"
+                            ng-change="testCaseFilter.status = fixValue(testCaseFilter.status)"
+                            >
+                        <option value=''>All</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="row-fluid">
+            <table class="table table-condensed table-hover table-bordered">
+                <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Start time</th>
+                    <th>Execution time</th>
+                    <th>Status</th>
+                    <th>Log</th>
+                </tr>
+                </thead>
+                <tbody>
+                {{ status }}
+                <tr ng-repeat="testCase in testCaseList | filter:testCaseFilter | orderBy:'name' ">
+                    <td>{{ testCase.name }}</td>
+                    <td>{{ testCase.start_time }}</td>
+                    <td>{{ testCase.execution_time | showTime }}</td>
+                    <td>{{ testCase.status }}</td>
+                    <td><div class="btn btn-mini" ng-click='showLog(testCase)'><i class="icon-list-alt"></i></div></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

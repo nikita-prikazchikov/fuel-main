@@ -1,0 +1,80 @@
+<script type="text/ng-template" id="testStepTemplate">
+    <div class="span12 header {{ testStep.status == 'passed' | getResult:'text-success':'text-error' }}">
+        <div class="span11">
+            <strong>{{ $index + 1 }}. {{ testStep.comment }}</strong>
+            <div ng-include="'fileTemplate'" ng-repeat="file in testStep.files"></div>
+        </div>
+        <div class="span1 status">
+            <div
+                    class="btn btn-mini {{ testStep.status == 'passed' | getResult:'btn-success':'btn-danger' }}"
+                    ng-init="visible = testStep.status == 'failed' && testStep.children.length > 0"
+                    ng-click="visible = !visible"
+                    >{{ testStep.status }}</div>
+        </div>
+    </div>
+    <div class="span12 test-step-log-content well well-small" ng-show="visible">
+        <div ng-include="'testStepDetailsTemplate'" ng-repeat="element in testStep.children"></div>
+    </div>
+</script>
+
+<script type="text/ng-template" id="testStepDetailsTemplate">
+    <div class="row-fluid {{ element.status == 'passed' | getResult:' ':'text-error' }}">
+        {{ $index + 1 }}.
+        <span class="label {{ element.status == 'passed' | getResult:'label-success':'label-important' }}">
+            <i class="icon-white {{ element.status == 'passed' | getResult:'icon-ok':'icon-remove' }}"></i></span>
+        <span>{{ element.comment }}</span>
+        <div ng-include="'fileTemplate'" ng-repeat="file in element.files"></div>
+        <div style="padding-left: 20px;" ng-include="'testStepDetailsTemplate'" ng-repeat="element in element.children"></div>
+    </div>
+</script>
+
+<script type="text/ng-template" id="fileTemplate">
+    <span class="fancybox">
+        <a href="{{ file.url }}" target="_blank" rel="group_1" title="{{ file.name }}">
+            <i class="{{ file.type == 'image' | getResult:'icon-picture':'icon-file' }}"></i>
+        </a>
+    </span>
+</script>
+
+<div class="modal-header">
+    <button type="button" class="close" ng-click="close()">×</button>
+    <h3>Test case execution log</h3>
+</div>
+<div class="modal-body">
+    <div class="row-fluid">
+        <h4>Test suite: {{ testCase.test_suite_name }}</h4>
+        <h4>Test case: {{ testCase.name }}</h4>
+
+        <div class="row-fluid">
+            <div class="span3">
+                <div class="well">
+                    <dl>
+                        <dt>Status</dt>
+                        <dd>
+                            <span class="badge {{ testCase.status == 'passed' | getResult:'badge-success':'badge-important' }}">
+                            {{ testCase.status }}</span>
+                        </dd>
+                        <dt>Start time</dt>
+                        <dd>{{ testCase.start_time }}</dd>
+                        <dt>End time</dt>
+                        <dd>{{ testCase.start_time }}</dd>
+                        <dt>Execution time</dt>
+                        <dd>{{ testCase.execution_time | showTime }}</dd>
+                    </dl>
+                </div>
+            </div>
+            <div class="span9 container-fluid">
+                <h4>Test steps:</h4>
+
+                <div class="row-fluid">
+                    <div class="row-fluid" ng-repeat="testStep in testStepList" ng-include="'testStepTemplate'"></div>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+</div>
+<div class="modal-footer">
+    <div class="btn" ng-click="close()"><i class="icon-ban-circle"></i> Close</div>
+</div>
