@@ -19,6 +19,7 @@ import os
 import time
 import urllib2
 from proboscis import SkipTest
+from fuelweb_test.helpers.test_log import LogTestCase, TestStep
 from fuelweb_test.settings import *
 from devops.helpers.helpers import SSHClient
 
@@ -86,6 +87,62 @@ def log_snapshot_on_error(func):
                     time=time.strftime("%Y_%m_%d__%H_%M_%S", time.gmtime())
                 )
                 save_logs(url, os.path.join(LOGS_DIR, log_file_name))
+    return wrapper
+
+
+def test_case(name=None, tags=None):
+    def wrapper(func):
+        @functools.wraps(func)
+        def wrapped(*args, **kwargs):
+            _test_case = LogTestCase(
+                name=name or func.__name__, tags=tags or [])
+            args[0].test_case = _test_case
+            try:
+                return func(*args, **kwargs)
+            except SkipTest:
+                _test_case.set_status(LogTestCase.SKIP)
+            except:
+                _test_case.set_status(LogTestCase.FAIL)
+                raise
+            finally:
+                if TEST_RESULT_LOGS_DIR:
+                    if not os.path.exists(TEST_RESULT_LOGS_DIR):
+                        os.makedirs(TEST_RESULT_LOGS_DIR)
+                    _test_case.save(TEST_RESULT_LOGS_DIR)
+        return wrapped
+    return wrapper
+
+
+def test_step(name=None):
+    def wrapper(func):
+        @functools.wraps(func)
+        def wrapped(*args, **kwargs):
+
+            if name is None:
+                if func.__doc__:
+                    _name = func.__doc__
+                else:
+                    _name = func.__name__
+            else:
+                _name = name
+
+            _test_step = TestStep(name=_name)
+            _test_case = args[0].test_case
+            _test_case.add_test_step(_test_step)
+            _test_case.add_depth_level()
+            try:
+                return func(*args, **kwargs)
+            except Exception, e:
+                if not _test_case.caught:
+                    _test_case.caught = True
+                    tmp = TestStep("Error: {}".format(e.message))
+                    tmp.set_status(LogTestCase.FAIL)
+                    _test_case.add_test_step(tmp)
+                _test_step.set_status(LogTestCase.FAIL)
+                raise
+            finally:
+                _test_case.pop_depth_level()
+        return wrapped
     return wrapper
 
 

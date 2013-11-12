@@ -17,9 +17,11 @@ import unittest
 from devops.helpers.helpers import SSHClient
 
 from proboscis import test, before_class, SkipTest
+from proboscis.asserts import assert_true
+from fuelweb_test.helpers.test_log import LogTestCase, TestStep
 
 from fuelweb_test.models.environment import EnvironmentModel
-from fuelweb_test.helpers.decorators import debug
+from fuelweb_test.helpers.decorators import debug, test_case, test_step
 from fuelweb_test.settings import *
 
 logging.basicConfig(
@@ -37,6 +39,7 @@ class TestBasic(object):
     def __init__(self):
         self.env = EnvironmentModel()
         self.fuel_web = self.env.fuel_web
+        self.test_case = LogTestCase("")
 
     def check_run(self, snapshot_name):
         """
@@ -50,6 +53,7 @@ class TestBasic(object):
 
 @test
 class SetupEnvironment(TestBasic):
+
     @test(groups=["setup"])
     def setup_master(self):
         self.check_run("empty")

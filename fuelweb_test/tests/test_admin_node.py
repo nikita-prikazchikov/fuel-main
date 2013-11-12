@@ -19,7 +19,7 @@ from devops.helpers.helpers import wait, tcp_ping, http
 from proboscis import test, SkipTest
 from proboscis.asserts import assert_equal
 
-from fuelweb_test.helpers.decorators import debug, log_snapshot_on_error
+from fuelweb_test.helpers.decorators import debug, log_snapshot_on_error, test_case, test_step
 from fuelweb_test.settings import OPENSTACK_RELEASE, OPENSTACK_RELEASE_CENTOS
 from fuelweb_test.tests.base_test_case import SetupEnvironment, TestBasic
 
