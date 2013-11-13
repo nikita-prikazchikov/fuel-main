@@ -1,7 +1,19 @@
 #!/bin/sh
 
+while getopts "d:" opt; do
+    case $opt in
+        d)
+            DATA_DIR="${OPTARG}"
+            ;;
+        :)
+            echo "Option -$OPTARG requires an argument."
+            exit 2
+            ;;
+    esac
+done
+
 if [ -z "${DATA_DIR}" ]; then
-    echo "Error! DATA_DIR is not set!"
+    echo "Error! DATA_DIR is not set! use -d option"
     exit 1
 fi
 
