@@ -37,7 +37,8 @@ function TestResultCtrl($scope, $routeParams, $location, TestResult) {
 
     $scope.testCaseFilter = {};
     $scope.testCaseFilter.status = $location.search().status || "";
-    $scope.testCaseFilter.tag = $location.search().tag || "";
+    $scope.testCaseFilter.tags = $location.search().tags || "";
+    $scope.testCaseFilter.environment = $location.search().environment || "";
 
     $scope.setTestCase=function(testCase){
         $scope.testCase = testCase;
@@ -47,38 +48,68 @@ function TestResultCtrl($scope, $routeParams, $location, TestResult) {
         return value == null ? '': value;
     };
 
-    $scope.showDetails = function( status, tag, environment ){
-        alert("status: " + status + " tag: " + tag + " env: " + environment );
-//        $location.search("status", status ? status : "" );
-//        $location.search("tag", tag ? tag : "" );
-//        $location.search("environment", environment ? environment : "" );
-//        $location.path("/tests");
+    $scope.showDetails = function( status, tags, environment ){
+        $location.search("status", status ? status : "" );
+        $location.search("tags", tags ? tags : "" );
+        $location.search("environment", environment ? environment : "" );
+        $location.path("/tests");
     };
 
-//    $scope.showLog = function (testCase) {
-//        var d = $dialog.dialog({
-//                backdrop: true,
-//                keyboard: true,
-//                backdropClick: true,
-//                templateUrl: "partials/log.html",
-//                controller: 'DialogController',
-//                dialogClass: "modal full-height big",
-//                resolve:{
-//                    testCase:function(){return testCase}
-//                }
-//            }
-//        );
-//        d.open();
-//    }
+    $scope.showLog = function (testCase) {
+        $location.path("/tests/{id}".replace("{id}", testCase ));
+    }
 }
 
-function DialogController($scope, dialog, testCase) {
+function TestCaseCtrl($scope, $routeParams, $location, TestResult) {
+    $scope.testCaseId = $routeParams.testCaseId;
 
-    $scope.testCase = testCase;
-    $scope.testStepList = eval(testCase.log);
-    $scope.testStepId = 0;
+    $scope.testCaseList = TestResult.query(function(){
+        $scope.testCaseList.forEach(function(item){
+            if ( item.id == $scope.testCaseId  ){
+                $scope.testCase = item;
+            }
+        });
+    });
 
-    $scope.close = function () {
-        dialog.close();
+    $scope.back = function(){
+        $location.path("/tests/{hash}".replace("{hash}", $location.hash()));
     };
+
+    $scope.getBtnClass = function( status ){
+        switch (status){
+            case "pass":
+                return "btn-success";
+            case "fail":
+                return "btn-danger";
+            case "skip":
+                return "btn-info";
+            default:
+                return "btn-default";
+        }
+    };
+
+    $scope.getTextClass = function( status ){
+        switch (status){
+            case "pass":
+                return "text-success";
+            case "fail":
+                return "text-danger";
+            case "skip":
+                return "text-info";
+            default:
+                return "";
+        }
+    };
+
+    $scope.getStatusIcon = function( testStep, visible ){
+        if ( testStep.steps.length > 0 ){
+            return visible ? "pointer glyphicon glyphicon-collapse-up" : "pointer glyphicon glyphicon-collapse-down";
+        }
+        return "glyphicon glyphicon-unchecked";
+    };
+
+
+
+
+
 }
