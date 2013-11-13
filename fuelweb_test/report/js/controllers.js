@@ -40,6 +40,18 @@ function TestResultCtrl($scope, $routeParams, $location, TestResult) {
     $scope.testCaseFilter.tags = $location.search().tags || "";
     $scope.testCaseFilter.environment = $location.search().environment || "";
 
+    $scope.$watch("testCaseFilter.status", function(newValue){
+        $location.search("status", newValue);
+    });
+
+    $scope.$watch("testCaseFilter.tags", function(newValue){
+        $location.search("tags", newValue);
+    });
+
+    $scope.$watch("testCaseFilter.environment", function(newValue){
+        $location.search("environment", newValue);
+    });
+
     $scope.setTestCase=function(testCase){
         $scope.testCase = testCase;
     };
